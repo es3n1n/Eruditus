@@ -30,6 +30,7 @@ from lib.discord_util import (
 )
 from lib.platforms import PlatformCTX, match_platform
 from lib.types import CTFStatusMode, Permissions
+from lib.types import Privacy
 from lib.util import (
     get_all_challenges_info,
     get_all_workon_info,
