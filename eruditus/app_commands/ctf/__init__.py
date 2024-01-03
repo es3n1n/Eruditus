@@ -1477,25 +1477,50 @@ class CTF(app_commands.Group):
             interaction: The interaction that triggered this command.
             url: Base URL of the CTF platform.
         """
+        await interaction.response.defer(ephemeral=True)
         ctx = PlatformCTX(base_url=strip_url_components(url.strip()))
+
         try:
             platform = await match_platform(ctx)
         except aiohttp.client_exceptions.InvalidURL:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 "The provided URL was invalid.",
                 ephemeral=True,
             )
             return
         except ClientError:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 "Could not communicate with the CTF platform, please try again.",
                 ephemeral=True,
             )
             return
 
         modal = await create_credentials_modal_for_platform(url, platform, interaction)
-        if modal is not None:
-            await interaction.response.send_modal(modal)
+        if modal is None:
+            await interaction.followup.send(
+                content=f"Something went wrong! `modal is None`",
+                ephemeral=True,
+            )
+            return
+
+        class Prompt(discord.ui.View):
+            def __init__(self) -> None:
+                super().__init__(timeout=None)
+                self.add_item(
+                    discord.ui.Button(
+                        style=discord.ButtonStyle.green, label="Open modal"
+                    )
+                )
+                self.children[0].callback = self.fill_information
+
+            @staticmethod
+            async def fill_information(new_interaction: discord.Interaction) -> None:
+                await new_interaction.response.send_modal(modal)
+
+        await interaction.followup.send(
+            content=f"Identified platform as `{platform.name if platform is not None else 'Unknown'}`",
+            view=Prompt(),
+        )
 
     @app_commands.checks.bot_has_permissions(manage_messages=True)
     @app_commands.command()
