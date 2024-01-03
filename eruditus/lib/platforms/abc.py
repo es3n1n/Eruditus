@@ -328,7 +328,7 @@ class PlatformCTX:
 
     @property
     def url_stripped(self) -> str:
-        return self.base_url.strip("/")
+        return self.base_url.strip("/") if self.base_url is not None else ""
 
     @staticmethod
     def from_credentials(credentials: dict[str, str]) -> "PlatformCTX":
