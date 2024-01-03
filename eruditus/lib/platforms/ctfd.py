@@ -35,7 +35,7 @@ from lib.validators.ctfd import (
     UserResponse,
 )
 
-_log = logging.getLogger(__name__)
+_log = logging.getLogger("discord.eruditus.ctfd")
 
 
 class ChallengeType(str, Enum):
