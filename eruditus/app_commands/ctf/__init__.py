@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-from typing import Callable, Optional
+from typing import Any, Callable, Coroutine, Optional
 
 import aiohttp
 import discord
@@ -16,6 +16,7 @@ from config import (
     DBNAME,
     MAX_CONTENT_SIZE,
     MONGO,
+    WORKON_COLLECTION,
 )
 from lib.discord_util import (
     add_challenge_worker,
@@ -28,10 +29,13 @@ from lib.discord_util import (
     send_scoreboard,
 )
 from lib.platforms import PlatformCTX, match_platform
-from lib.types import CTFStatusMode, Permissions, Privacy
+from lib.types import CTFStatusMode, Permissions
 from lib.util import (
+    get_all_challenges_info,
+    get_all_workon_info,
     get_challenge_info,
     get_ctf_info,
+    get_workon_info,
     sanitize_channel_name,
     strip_url_components,
 )
@@ -51,6 +55,7 @@ class CTF(app_commands.Group):
     async def on_error(
         self, interaction: discord.Interaction, error: app_commands.AppCommandError
     ) -> None:
+        # todo: @es3n1n: permissionerror check
         _log.exception(
             "Exception occurred due to `/%s %s`",
             interaction.command.parent.name,
@@ -101,37 +106,62 @@ class CTF(app_commands.Group):
                 break
         return suggestions
 
-    async def _challenge_autocompletion_func(
-        self, interaction: discord.Interaction, current: str
-    ) -> list[Choice[str]]:
-        """Autocomplete challenge name.
-
-        This function is inefficient, might improve it later.
+    @staticmethod
+    def get_challenge_autocompletion_func(
+        ignore_solved: bool, *fields: str
+    ) -> Callable[[...], Coroutine[Any, Any, list[Choice[str]]]]:
+        """Generate autocomplete challenge stub based on the challenge fields.
 
         Args:
-            interaction: The interaction that triggered this command.
-            current: The challenge name typed so far.
+            ignore_solved: Ignore solved challenges
+            fields: Fields that should be used for formatting.
 
         Returns:
-            A list of suggestions.
+            An autocompletion stub.
         """
-        ctf = get_ctf_info(guild_category=interaction.channel.category_id)
-        if ctf is None:
-            return []
+        assert len(fields) > 0
 
-        suggestions = []
-        for challenge_id in ctf["challenges"]:
-            challenge = get_challenge_info(_id=challenge_id)
-            if challenge is None or challenge["solved"]:
-                continue
+        async def _challenge_autocompletion_func(
+            interaction: discord.Interaction, current: str
+        ) -> list[Choice[str]]:
+            """Autocomplete challenge.
+            This function is inefficient, might improve it later.
 
-            display_name = f"{challenge['name']} ({challenge['category']})"
-            if not current.strip() or current.lower() in display_name.lower():
-                suggestions.append(Choice(name=display_name, value=challenge["name"]))
+            Args:
+                interaction: The interaction that triggered this command.
+                current: The challenge name typed so far.
 
-            if len(suggestions) == 25:
-                break
-        return suggestions
+            Returns:
+                A list of suggestions.
+            """
+            ctf = get_ctf_info(guild_category=interaction.channel.category_id)
+            if ctf is None:
+                return []
+
+            suggestions: dict[str, Choice] = {}
+            for challenge_id in ctf["challenges"]:
+                challenge = get_challenge_info(_id=challenge_id)
+                if challenge is None or challenge["solved"]:
+                    continue
+
+                key = ""
+                value = ""
+                for i, field in enumerate(fields):
+                    field = f" ({challenge[field]})" if i > 0 else challenge[field]
+                    key += field
+
+                    if i == 0:
+                        value = field
+
+                if current.strip() == "" or current.lower() in key.lower():
+                    suggestions[key] = Choice(name=key, value=value)
+
+                if len(suggestions) == 25:
+                    break
+
+            return list(suggestions.values())
+
+        return _challenge_autocompletion_func
 
     @app_commands.checks.bot_has_permissions(manage_channels=True, manage_roles=True)
     @app_commands.checks.has_permissions(manage_channels=True, manage_roles=True)
@@ -208,48 +238,7 @@ class CTF(app_commands.Group):
                private threads.
             name: CTF name (default: current channel's CTF).
         """
-
-        async def get_confirmation() -> bool:
-            class Prompt(discord.ui.View):
-                def __init__(self) -> None:
-                    super().__init__(timeout=None)
-                    self.add_item(
-                        discord.ui.Button(style=discord.ButtonStyle.green, label="Yes")
-                    )
-                    self.add_item(
-                        discord.ui.Button(style=discord.ButtonStyle.red, label="No")
-                    )
-                    self.children[0].callback = self.yes_callback
-                    self.children[1].callback = self.no_callback
-
-                async def yes_callback(_, interaction: discord.Interaction) -> None:
-                    await interaction.response.edit_message(
-                        content="🔄 Starting CTF archival...",
-                        view=None,
-                    )
-                    await self.archivectf.callback(
-                        self,
-                        interaction=interaction,
-                        permissions=permissions,
-                        members=members or "",
-                        name=name,
-                    )
-
-                async def no_callback(_, interaction: discord.Interaction) -> None:
-                    await interaction.response.edit_message(
-                        content="Aborting CTF archival.", view=None
-                    )
-
-            await interaction.response.send_message(
-                content=(
-                    "It appears that you forgot to set the `members` parameter, this "
-                    "is important if you want to grant people access to private "
-                    "threads that they weren't part of.\n"
-                    "⚠️ This action cannot be undone, would you like to continue?"
-                ),
-                view=Prompt(),
-                ephemeral=True,
-            )
+        await interaction.response.defer()
 
         if name is not None:
             ctf = get_ctf_info(name=name)
@@ -257,7 +246,7 @@ class CTF(app_commands.Group):
             ctf = get_ctf_info(guild_category=interaction.channel.category_id)
 
         if not ctf:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 (
                     "Run this command from within a CTF channel, or provide the name "
                     "of the CTF you wish to archive."
@@ -270,16 +259,10 @@ class CTF(app_commands.Group):
 
         # In case CTF was already archived.
         if ctf["archived"]:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 "This CTF was already archived.", ephemeral=True
             )
             return
-
-        if members is None:
-            return await get_confirmation()
-
-        if not interaction.response.is_done():
-            await interaction.response.defer()
 
         category_channel = discord.utils.get(
             interaction.guild.categories, id=ctf["guild_category"]
@@ -338,7 +321,7 @@ class CTF(app_commands.Group):
                 continue
             await thread.edit(locked=locked, invitable=True)
 
-            if not members:
+            if members is None:
                 continue
 
             # XXX Until Discord supports changing threads privacy, this is the only
@@ -395,11 +378,7 @@ class CTF(app_commands.Group):
             {"_id": ctf["_id"]}, {"$set": {"archived": True, "ended": True}}
         )
 
-        msg = f"✅ CTF `{ctf['name']}` has been archived."
-        if interaction.response.is_done():
-            await interaction.edit_original_response(content=msg)
-            return
-        await interaction.followup.send(content=msg)
+        await interaction.followup.send(f"✅ CTF `{ctf['name']}` has been archived.")
 
     @app_commands.checks.bot_has_permissions(manage_channels=True, manage_roles=True)
     @app_commands.checks.has_permissions(manage_channels=True, manage_roles=True)
@@ -451,58 +430,18 @@ class CTF(app_commands.Group):
             await role.delete()
 
         # Delete all challenges for that CTF from the database.
-        for challenge_id in ctf["challenges"]:
-            MONGO[DBNAME][CHALLENGE_COLLECTION].delete_one({"_id": challenge_id})
+        MONGO[DBNAME][CHALLENGE_COLLECTION].delete_many({"ctf_id": ctf["_id"]})
 
         # Delete the CTF from the database.
         MONGO[DBNAME][CTF_COLLECTION].delete_one({"_id": ctf["_id"]})
+
+        # Delete the workon info
+        MONGO[DBNAME][WORKON_COLLECTION].delete_many({"ctf_id": ctf["_id"]})
 
         # Only send a followup message if the channel from which the command was issued
         # still exists, otherwise we will fail with a 404 not found.
         if name and interaction.channel.category_id != category_channel.id:
             await interaction.followup.send(f"✅ CTF `{ctf['name']}` has been deleted.")
-
-    @app_commands.checks.bot_has_permissions(manage_channels=True, manage_roles=True)
-    @app_commands.checks.has_permissions(manage_channels=True, manage_roles=True)
-    @app_commands.command()
-    async def setprivacy(
-        self,
-        interaction: discord.Interaction,
-        privacy: Privacy,
-        name: Optional[str] = None,
-    ) -> None:
-        """Toggle a CTF privacy. Making the CTF private disallows others from joining
-        the CTF and would require an admin invitation.
-
-        Args:
-            interaction: The interaction that triggered this command.
-            name: Name of the CTF to delete (default: CTF associated with the
-                category channel from which the command was issued).
-            privacy: The CTF privacy.
-        """
-        if name is not None:
-            ctf = get_ctf_info(name=name)
-        else:
-            ctf = get_ctf_info(guild_category=interaction.channel.category_id)
-
-        if not ctf:
-            await interaction.followup.send(
-                (
-                    "Run this command from within a CTF channel, or provide the name "
-                    "of the CTF for which you wish to change the privacy."
-                )
-                if name is None
-                else "No such CTF.",
-                ephemeral=True,
-            )
-            return
-
-        MONGO[DBNAME][CTF_COLLECTION].update_one(
-            {"_id": ctf["_id"]}, {"$set": {"private": bool(privacy.value)}}
-        )
-        await interaction.response.send_message(
-            f"CTF privacy changed to `{privacy.name}`", ephemeral=True
-        )
 
     @app_commands.checks.bot_has_permissions(manage_roles=True)
     @app_commands.checks.has_permissions(manage_roles=True)
@@ -577,13 +516,6 @@ class CTF(app_commands.Group):
         ctf = get_ctf_info(name=name)
         if ctf is None:
             await interaction.response.send_message("No such CTF.", ephemeral=True)
-            return
-
-        if ctf.get("private"):
-            await interaction.response.send_message(
-                "This CTF is private and requires invitation by an admin.",
-                ephemeral=True,
-            )
             return
 
         role = discord.utils.get(interaction.guild.roles, id=ctf["guild_role"])
@@ -680,6 +612,8 @@ class CTF(app_commands.Group):
             )
             return
 
+        await interaction.response.defer()
+
         category_channel = discord.utils.get(
             interaction.guild.categories, id=interaction.channel.category_id
         )
@@ -734,6 +668,7 @@ class CTF(app_commands.Group):
                 "solve_time": None,
                 "solve_announcement": None,
                 "flag": None,
+                "ctf_id": ctf["_id"],
             }
         )
 
@@ -743,9 +678,15 @@ class CTF(app_commands.Group):
             {"_id": ctf["_id"]}, {"$set": {"challenges": ctf["challenges"]}}
         )
 
-        await interaction.response.send_message(
-            f"✅ Challenge `{name}` has been created."
-        )
+        # Add all subscribed players to the channel
+        for workon_info in get_all_workon_info(ctf["_id"], category):
+            user = interaction.guild.get_member(workon_info["user_id"])
+            if not user:
+                continue
+
+            await challenge_thread.add_user(user)
+
+        await interaction.followup.send(f"✅ Challenge `{name}` has been created.")
         await text_channel.edit(
             name=text_channel.name.replace("💤", "🔄").replace("🎯", "🔄")
         )
@@ -793,7 +734,9 @@ class CTF(app_commands.Group):
 
     @app_commands.checks.bot_has_permissions(manage_channels=True)
     @app_commands.command()
-    @app_commands.autocomplete(name=_challenge_autocompletion_func)  # type: ignore
+    @app_commands.autocomplete(
+        name=get_challenge_autocompletion_func(False, "name", "category")
+    )  # type: ignore
     @_in_ctf_channel()
     async def deletechallenge(
         self, interaction: discord.Interaction, name: Optional[str] = None
@@ -940,10 +883,6 @@ class CTF(app_commands.Group):
         await announcement.edit(view=WorkonButton(oid=challenge["_id"], disabled=True))
 
         await interaction.followup.send("✅ Challenge solved.")
-        await interaction.followup.send(
-            "💡 Make sure to use `/ctf submit` instead in order to track first bloods.",
-            ephemeral=True,
-        )
 
         # We leave editing the channel name till the end since we might get rate
         # limited, causing a sleep that will block this function call.
@@ -1029,7 +968,9 @@ class CTF(app_commands.Group):
 
     @app_commands.checks.bot_has_permissions(manage_channels=True)
     @app_commands.command()
-    @app_commands.autocomplete(name=_challenge_autocompletion_func)  # type: ignore
+    @app_commands.autocomplete(
+        name=get_challenge_autocompletion_func(True, "name", "category")
+    )  # type: ignore
     @_in_ctf_channel()
     async def workon(self, interaction: discord.Interaction, name: str) -> None:
         """Start working on a challenge and join its thread.
@@ -1071,7 +1012,9 @@ class CTF(app_commands.Group):
 
     @app_commands.checks.bot_has_permissions(manage_channels=True)
     @app_commands.command()
-    @app_commands.autocomplete(name=_challenge_autocompletion_func)  # type: ignore
+    @app_commands.autocomplete(
+        name=get_challenge_autocompletion_func(True, "name", "category")
+    )  # type: ignore
     @_in_ctf_channel()
     async def unworkon(
         self, interaction: discord.Interaction, name: Optional[str] = None
@@ -1115,11 +1058,163 @@ class CTF(app_commands.Group):
         )
         await remove_challenge_worker(challenge_thread, challenge, interaction.user)
         await challenge_thread.send(
-            f"{interaction.user.name} left you alone, what a chicken! 🐥"
+            f"{interaction.user.mention} left you alone, what a chicken! 🐥"
         )
 
         await interaction.response.send_message(
             f"✅ Removed from the `{challenge['name']}` challenge.", ephemeral=True
+        )
+
+    @app_commands.checks.bot_has_permissions(manage_channels=True)
+    @app_commands.command()
+    @app_commands.autocomplete(
+        name=get_challenge_autocompletion_func(False, "category")
+    )
+    @_in_ctf_channel()
+    async def workon_category(
+        self, interaction: discord.Interaction, name: Optional[str] = None
+    ) -> None:
+        """Work on a challenge category (default: current thread's challenge category).
+
+        Args:
+            interaction: The interaction that triggered this command.
+            name: Category name (case insensitive).
+        """
+        # Get the current ctf
+        current_ctf = get_ctf_info(guild_category=interaction.channel.category_id)
+
+        # Extract the category name if needed
+        if name is None:
+            challenge = get_challenge_info(thread=interaction.channel_id)
+            if challenge is None:
+                await interaction.response.send_message(
+                    (
+                        "Run this command from within a challenge thread, "
+                        "or provide the name of the category you wish to join."
+                    ),
+                    ephemeral=True,
+                )
+                return
+
+            name = challenge["category"]
+
+        # Check if already working on this category
+        if get_workon_info(current_ctf["_id"], interaction.user.id, name):
+            await interaction.response.send_message(
+                "You are already working on this category.",
+                ephemeral=True,
+            )
+            return
+
+        # Select challenges with this category
+        challenges = get_all_challenges_info(category=name, ctf_id=current_ctf["_id"])
+        if len(challenges) == 0:
+            await interaction.response.send_message(
+                "Found 0 challenges with such category.",
+                ephemeral=True,
+            )
+            return
+
+        # Defer the interaction since the logic below could take some time
+        await interaction.response.defer()
+
+        # Iterating over the challenges and adding the user
+        counter: int = 0
+        for challenge in challenges:
+            # We don't need to remove the participant from explicitly `workon`'d challs
+            if interaction.user.name in challenge["players"]:
+                continue
+
+            # Get the thread and add member
+            thread = interaction.guild.get_thread(challenge["thread"])
+            if not thread:
+                continue
+
+            await thread.add_user(interaction.user)
+            counter += 1
+
+        # Insert new workon info
+        MONGO[DBNAME][WORKON_COLLECTION].insert_one(
+            {
+                "ctf_id": current_ctf["_id"],
+                "user_id": interaction.user.id,
+                "category": name,
+            }
+        )
+
+        # We are done here
+        await interaction.followup.send(
+            f"Added to `{counter}` challenge(s) from the `{name}` category."
+        )
+
+    @app_commands.checks.bot_has_permissions(manage_channels=True)
+    @app_commands.command()
+    @app_commands.autocomplete(
+        name=get_challenge_autocompletion_func(False, "category")
+    )
+    @_in_ctf_channel()
+    async def unworkon_category(
+        self, interaction: discord.Interaction, name: Optional[str] = None
+    ) -> None:
+        """Stop working on a challenge category (default: current thread's
+        challenge category).
+
+        Args:
+            interaction: The interaction that triggered this command.
+            name: Category name (case insensitive).
+        """
+        # Get the current ctf
+        current_ctf = get_ctf_info(guild_category=interaction.channel.category_id)
+
+        # Extract the category name if needed
+        if name is None:
+            challenge = get_challenge_info(thread=interaction.channel_id)
+            if challenge is None:
+                await interaction.response.send_message(
+                    (
+                        "Run this command from within a challenge thread, "
+                        "or provide the name of the category."
+                    ),
+                    ephemeral=True,
+                )
+                return
+
+            name = challenge["category"]
+
+        # Get the workon info
+        workon_info = get_workon_info(current_ctf["_id"], interaction.user.id, name)
+        if not workon_info:
+            await interaction.response.send_message(
+                "You are not working on this category"
+            )
+            return
+
+        # Defer the response since it could take some time to complete
+        await interaction.response.defer()
+
+        # Iterating over the challenges from this category
+        count: int = 0
+        for challenge in get_all_challenges_info(
+            category=name, ctf_id=current_ctf["_id"]
+        ):
+            # We don't need to remove the participant from explicitly `workon`'d challs
+            if interaction.user.name in challenge["players"]:
+                continue
+
+            # Otherwise get the thread and remove user from it
+            thread = interaction.guild.get_thread(challenge["thread"])
+            if not thread:
+                continue
+
+            await thread.remove_user(interaction.user)
+            count += 1
+
+        # Delete the workon info
+        MONGO[DBNAME][WORKON_COLLECTION].delete_one({"_id": workon_info["_id"]})
+
+        # We are done here
+        await interaction.followup.send(
+            f"Removed from `{count}` challenge(s) from the `{name}` category"
         )
 
     @app_commands.checks.bot_has_permissions(manage_channels=True)
