@@ -50,7 +50,7 @@ class RCTFChallenge(BaseModel):
     description: Optional[str] = None
     author: Optional[str] = None
 
-    def convert(self, url_stripped: str) -> Challenge:
+    def convert(self, url_stripped: str, me: Optional["Team"] = None) -> Challenge:
         return Challenge(
             id=self.id,
             category=self.category,
@@ -62,6 +62,9 @@ class RCTFChallenge(BaseModel):
             else None,
             images=extract_images_from_html(self.description, url_stripped),
             solves=self.solves if self.solves is not None else 0,
+            solved_by_me=(self.id in [x.id for x in me.solves])
+            if me is not None
+            else False,
         )
 
 

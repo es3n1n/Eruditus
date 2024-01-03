@@ -181,9 +181,12 @@ class RCTF(PlatformABC):
             if not data or data.is_not_good() or not data.data:
                 return
 
+            # Get a team object
+            me = await cls.get_me(ctx)
+
             # Iterate over challenges and parse them
             for challenge in data.data:
-                yield challenge.convert(ctx.url_stripped)
+                yield challenge.convert(ctx.url_stripped, me)
 
     @classmethod
     async def pull_scoreboard(
