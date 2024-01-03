@@ -415,7 +415,7 @@ class Eruditus(discord.Client):
                 start_time=scheduled_event.start_time,
                 end_time=scheduled_event.end_time,
                 entity_type=scheduled_event.entity_type,
-                location=f"🌐 {scheduled_event.location}",
+                location=f"🌐 {scheduled_event.location}"[:100],
                 privacy_level=discord.PrivacyLevel.guild_only,
             )
 
