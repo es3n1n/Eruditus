@@ -10,7 +10,6 @@ import aiohttp
 import discord
 from bson import ObjectId
 from discord.ext import tasks
-from discord.utils import setup_logging
 
 import config
 from app_commands.bookmark import Bookmark
@@ -48,9 +47,9 @@ from lib.ctftime.misc import ctftime_date_to_datetime
 from lib.ctftime.teams import get_ctftime_team_info
 from lib.ctftime.types import CTFTimeDiffType
 from lib.discord_util import get_challenge_category_channel, send_scoreboard
-from lib.platforms import Platform
-from lib.platforms import PlatformCTX, match_platform
+from lib.platforms import Platform, PlatformCTX, match_platform
 from lib.util import (
+    country_name,
     derive_colour,
     get_all_workon_info,
     get_challenge_info,
@@ -970,7 +969,6 @@ class Eruditus(discord.Client):
 
 
 if __name__ == "__main__":
-    setup_logging()
-    logger = logging.getLogger("eruditus")
+    logger = logging.getLogger("discord.eruditus")
     client = Eruditus()
     client.run(os.getenv("DISCORD_TOKEN"))
