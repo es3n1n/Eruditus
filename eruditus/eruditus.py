@@ -603,7 +603,9 @@ class Eruditus(discord.Client):
         # The bot is supposed to be part of a single guild.
         guild = self.get_guild(GUILD_ID)
 
-        for ctf in MONGO[DBNAME][CTF_COLLECTION].find({"ended": False}):
+        for ctf in MONGO[DBNAME][CTF_COLLECTION].find(
+            {"ended": False, "archived": False}
+        ):
             url = ctf["credentials"]["url"]
 
             if url is None:
