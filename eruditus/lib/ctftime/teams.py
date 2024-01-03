@@ -51,17 +51,15 @@ async def get_ctftime_team_info(team_id: int) -> Optional[CTFTimeTeam]:
         event_id = int(event["href"].split("/").pop())
         event_name = event.text.strip()
 
-        place, ctf_points, rating_points = (
-            td.text.strip() for td in row.select("td:not(.place_ico):not(:has(a))")
-        )
+        args = [td.text.strip() for td in row.select("td:not(.place_ico):not(:has(a))")]
 
         # Assemble the scoreboard entry.
         result.participated_in[event_id] = CTFTimeParticipatedEvent(
-            place=int(place),
+            place=int(args[0]),
             event_name=event_name,
             event_id=event_id,
-            ctf_points=float(ctf_points),
-            rating_points=float(rating_points),
+            ctf_points=float(args[1]),
+            rating_points=float(args[2] if len(args) > 2 else 0),
         )
 
     return result
