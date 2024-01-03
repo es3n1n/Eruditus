@@ -242,7 +242,58 @@ class CTF(app_commands.Group):
                private threads.
             name: CTF name (default: current channel's CTF).
         """
-        await interaction.response.defer()
+        """Archive a CTF by making its channels read-only by default.
+
+                Args:
+                    interaction: The interaction that triggered this command.
+                    permissions: Whether channels should be read-only or writable
+                       as well (default: read only).
+                    members: A list of member or role mentions to be granted access into the
+                       private threads.
+                    name: CTF name (default: current channel's CTF).
+                """
+
+        async def get_confirmation() -> bool:
+            class Prompt(discord.ui.View):
+                def __init__(self) -> None:
+                    super().__init__(timeout=None)
+                    self.add_item(
+                        discord.ui.Button(style=discord.ButtonStyle.green, label="Yes")
+                    )
+                    self.add_item(
+                        discord.ui.Button(style=discord.ButtonStyle.red, label="No")
+                    )
+                    self.children[0].callback = self.yes_callback
+                    self.children[1].callback = self.no_callback
+
+                async def yes_callback(_, interaction: discord.Interaction) -> None:
+                    await interaction.response.edit_message(
+                        content="🔄 Starting CTF archival...",
+                        view=None,
+                    )
+                    await self.archivectf.callback(
+                        self,
+                        interaction=interaction,
+                        permissions=permissions,
+                        members=members or "",
+                        name=name,
+                    )
+
+                async def no_callback(_, interaction: discord.Interaction) -> None:
+                    await interaction.response.edit_message(
+                        content="Aborting CTF archival.", view=None
+                    )
+
+            await interaction.response.send_message(
+                content=(
+                    "It appears that you forgot to set the `members` parameter, this "
+                    "is important if you want to grant people access to private "
+                    "threads that they weren't part of.\n"
+                    "⚠️ This action cannot be undone, would you like to continue?"
+                ),
+                view=Prompt(),
+                ephemeral=True,
+            )
 
         if name is not None:
             ctf = get_ctf_info(name=name)
@@ -250,7 +301,7 @@ class CTF(app_commands.Group):
             ctf = get_ctf_info(guild_category=interaction.channel.category_id)
 
         if not ctf:
-            await interaction.followup.send(
+            await interaction.response.send_message(
                 (
                     "Run this command from within a CTF channel, or provide the name "
                     "of the CTF you wish to archive."
@@ -263,10 +314,16 @@ class CTF(app_commands.Group):
 
         # In case CTF was already archived.
         if ctf["archived"]:
-            await interaction.followup.send(
+            await interaction.response.send_message(
                 "This CTF was already archived.", ephemeral=True
             )
             return
+
+        if members is None:
+            return await get_confirmation()
+
+        if not interaction.response.is_done():
+            await interaction.response.defer()
 
         category_channel = discord.utils.get(
             interaction.guild.categories, id=ctf["guild_category"]
@@ -325,7 +382,7 @@ class CTF(app_commands.Group):
                 continue
             await thread.edit(locked=locked, invitable=True)
 
-            if members is None:
+            if not members:
                 continue
 
             # XXX Until Discord supports changing threads privacy, this is the only
@@ -382,7 +439,11 @@ class CTF(app_commands.Group):
             {"_id": ctf["_id"]}, {"$set": {"archived": True, "ended": True}}
         )
 
-        await interaction.followup.send(f"✅ CTF `{ctf['name']}` has been archived.")
+        msg = f"✅ CTF `{ctf['name']}` has been archived."
+        if interaction.response.is_done():
+            await interaction.edit_original_response(content=msg)
+            return
+        await interaction.followup.send(content=msg)
 
     @app_commands.checks.bot_has_permissions(manage_channels=True, manage_roles=True)
     @app_commands.checks.has_permissions(manage_channels=True, manage_roles=True)
@@ -446,6 +507,48 @@ class CTF(app_commands.Group):
         # still exists, otherwise we will fail with a 404 not found.
         if name and interaction.channel.category_id != category_channel.id:
             await interaction.followup.send(f"✅ CTF `{ctf['name']}` has been deleted.")
+
+    @app_commands.checks.bot_has_permissions(manage_channels=True, manage_roles=True)
+    @app_commands.checks.has_permissions(manage_channels=True, manage_roles=True)
+    @app_commands.command()
+    async def setprivacy(
+        self,
+        interaction: discord.Interaction,
+        privacy: Privacy,
+        name: Optional[str] = None,
+    ) -> None:
+        """Toggle a CTF privacy. Making the CTF private disallows others from joining
+        the CTF and would require an admin invitation.
+
+        Args:
+            interaction: The interaction that triggered this command.
+            name: Name of the CTF to delete (default: CTF associated with the
+                category channel from which the command was issued).
+            privacy: The CTF privacy.
+        """
+        if name is not None:
+            ctf = get_ctf_info(name=name)
+        else:
+            ctf = get_ctf_info(guild_category=interaction.channel.category_id)
+
+        if not ctf:
+            await interaction.followup.send(
+                (
+                    "Run this command from within a CTF channel, or provide the name "
+                    "of the CTF for which you wish to change the privacy."
+                )
+                if name is None
+                else "No such CTF.",
+                ephemeral=True,
+            )
+            return
+
+        MONGO[DBNAME][CTF_COLLECTION].update_one(
+            {"_id": ctf["_id"]}, {"$set": {"private": bool(privacy.value)}}
+        )
+        await interaction.response.send_message(
+            f"CTF privacy changed to `{privacy.name}`", ephemeral=True
+        )
 
     @app_commands.checks.bot_has_permissions(manage_roles=True)
     @app_commands.checks.has_permissions(manage_roles=True)
@@ -520,6 +623,13 @@ class CTF(app_commands.Group):
         ctf = get_ctf_info(name=name)
         if ctf is None:
             await interaction.response.send_message("No such CTF.", ephemeral=True)
+            return
+
+        if ctf.get("private"):
+            await interaction.response.send_message(
+                "This CTF is private and requires invitation by an admin.",
+                ephemeral=True,
+            )
             return
 
         role = discord.utils.get(interaction.guild.roles, id=ctf["guild_role"])
@@ -887,6 +997,10 @@ class CTF(app_commands.Group):
         await announcement.edit(view=WorkonButton(oid=challenge["_id"], disabled=True))
 
         await interaction.followup.send("✅ Challenge solved.")
+        await interaction.followup.send(
+            "💡 Make sure to use `/ctf submit` instead in order to track first bloods.",
+            ephemeral=True,
+        )
 
         # We leave editing the channel name till the end since we might get rate
         # limited, causing a sleep that will block this function call.
@@ -1062,7 +1176,7 @@ class CTF(app_commands.Group):
         )
         await remove_challenge_worker(challenge_thread, challenge, interaction.user)
         await challenge_thread.send(
-            f"{interaction.user.mention} left you alone, what a chicken! 🐥"
+            f"{interaction.user.name} left you alone, what a chicken! 🐥"
         )
 
         await interaction.response.send_message(
