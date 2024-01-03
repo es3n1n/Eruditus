@@ -48,10 +48,11 @@ from lib.ctftime.misc import ctftime_date_to_datetime
 from lib.ctftime.teams import get_ctftime_team_info
 from lib.ctftime.types import CTFTimeDiffType
 from lib.discord_util import get_challenge_category_channel, send_scoreboard
+from lib.platforms import Platform
 from lib.platforms import PlatformCTX, match_platform
 from lib.util import (
-    country_name,
     derive_colour,
+    get_all_workon_info,
     get_challenge_info,
     get_ctf_info,
     get_local_time,
@@ -211,7 +212,12 @@ class Eruditus(discord.Client):
         await self.tree.sync()
         await self.tree.sync(guild=discord.Object(id=GUILD_ID))
 
-        await self.change_presence(activity=discord.Game(name="/help"))
+        await self.change_presence(
+            activity=discord.Game(
+                name=f"/help ~ {config.COMMIT_HASH:.8} ~ {len(Platform) - 1} platforms "
+                "supported"
+            )
+        )
 
     async def on_guild_join(self, guild: discord.Guild) -> None:
         logger.info("%s joined %s!", self.user, guild)
@@ -417,7 +423,7 @@ class Eruditus(discord.Client):
             # Ignore this event if not too many people are interested in it.
             users = [user async for user in scheduled_event.users()]
             if len(users) < MIN_PLAYERS:
-                if reminder_channel:
+                if reminder_channel and not config.NOTIFICATIONS_DISABLE_UNINTERESTED:
                     await reminder_channel.send(
                         f"🔔 CTF `{event_name}` starting "
                         f"<t:{scheduled_event.start_time.timestamp():.0f}:R>.\n"
@@ -767,6 +773,14 @@ class Eruditus(discord.Client):
                 MONGO[DBNAME][CTF_COLLECTION].update_one(
                     {"_id": ctf["_id"]}, {"$set": {"challenges": ctf["challenges"]}}
                 )
+
+                # Add all subscribed players to the channel
+                for workon_info in get_all_workon_info(ctf["_id"], challenge.category):
+                    user = guild.get_member(workon_info["user_id"])
+                    if not user:
+                        continue
+
+                    await challenge_thread.add_user(user)
 
                 await text_channel.edit(
                     name=text_channel.name.replace("💤", "🔄").replace("🎯", "🔄")
