@@ -3,8 +3,7 @@ from urllib.parse import parse_qs, urlencode, urlparse
 
 import discord
 
-from lib.discord_util import is_deferred
-from lib.discord_util import update_credentials
+from lib.discord_util import is_deferred, update_credentials
 from lib.platforms import Platform, PlatformABC, PlatformCTX
 from lib.util import (
     extract_rctf_team_token,
