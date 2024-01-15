@@ -9,6 +9,7 @@ from bs4 import BeautifulSoup
 
 from lib.platforms.abc import (
     Challenge,
+    ChallengeHint,
     ChallengeSolver,
     Optional,
     PlatformABC,
@@ -25,15 +26,36 @@ from lib.util import deserialize_response, is_empty_string
 from lib.validators.ctfd import (
     ChallengeResponse,
     ChallengesResponse,
+    HintResponse,
     MessageResponse,
     ScoreboardResponse,
     SolvesResponse,
     StandingsResponse,
     SubmissionResponse,
+    UnlockResponse,
     UserResponse,
 )
 
 _log = logging.getLogger("discord.eruditus.ctfd")
+
+
+async def fetch_csrf_token(ctx: PlatformCTX) -> Optional[str]:
+    """Fetch the CSRF token from CTFd
+
+    Args:
+        ctx: Platform context
+
+    Returns:
+        Optional string: CSRF token
+    """
+    async with aiohttp.request(
+        method="get", url=f"{ctx.url_stripped}/challenges", cookies=ctx.session.cookies
+    ) as response:
+        r = re.search('(?<=csrfNonce\': ")[A-Fa-f0-9]+(?=")', await response.text())
+        if not r:
+            return None
+
+        return r.group(0)
 
 
 class CTFd(PlatformABC):
@@ -158,21 +180,11 @@ class CTFd(PlatformABC):
             return
 
         ctfd_base_url = ctx.url_stripped
+        csrf_nonce = await fetch_csrf_token(ctx)
+        if not csrf_nonce:
+            return
 
-        # Get CSRF token.
-        async with aiohttp.request(
-            method="get", url=f"{ctfd_base_url}/challenges", cookies=ctx.session.cookies
-        ) as response:
-            csrf_nonce = re.search(
-                '(?<=csrfNonce\': ")[A-Fa-f0-9]+(?=")', await response.text()
-            )
-
-        if csrf_nonce is None:
-            return None
-
-        csrf_nonce = csrf_nonce.group(0)
         json = {"challenge_id": int(challenge_id), "submission": flag}
-
         async with aiohttp.request(
             method="post",
             url=f"{ctfd_base_url}/api/v1/challenges/attempt",
@@ -515,6 +527,60 @@ class CTFd(PlatformABC):
                 return
 
             return data.data.convert(ctx.url_stripped)
+
+    @classmethod
+    async def get_hint(cls, ctx: PlatformCTX, hint_id: str) -> Optional[ChallengeHint]:
+        """Get a challenge hint by its ID.
+
+        Args:
+            ctx: Platform context
+            hint_id: Hint identifier
+
+        Returns:
+            Parsed hint.
+        """
+        if not await ctx.login(cls.login):
+            return None
+
+        async with aiohttp.request(
+            method="get",
+            url=f"{ctx.base_url}/api/v1/hints/{hint_id}",
+            cookies=ctx.session.cookies,
+            allow_redirects=False,
+        ) as response:
+            # Validate and deserialize response
+            data = await deserialize_response(response, model=HintResponse)
+            if not data:
+                return None
+
+            return data.data.convert()
+
+    @classmethod
+    async def unlock_hint(cls, ctx: PlatformCTX, hint_id: str) -> bool:
+        """Unlock a challenge hint by its ID
+
+        Args:
+            ctx: Platform context
+            hint_id: Hint identifier
+
+        Returns:
+            True if unlocked
+        """
+        if not await ctx.login(cls.login):
+            return False
+
+        async with aiohttp.request(
+            method="post",
+            url=f"{ctx.base_url}/api/v1/unlocks",
+            cookies=ctx.session.cookies,
+            allow_redirects=False,
+            data={"target": int(hint_id), "type": "hints"},
+            headers={"CSRF-Token": await fetch_csrf_token(ctx)},
+        ) as response:
+            data = await deserialize_response(response, model=UnlockResponse)
+
+            # We don't really care what it says, as long as it returns success: true
+            return data is not None
 
     @classmethod
     async def get_me(cls, ctx: PlatformCTX) -> Optional[Team]:

@@ -4,7 +4,7 @@ import os
 import traceback
 from binascii import hexlify
 from datetime import datetime, timedelta
-from typing import Any, Union
+from typing import Any, Optional, Union
 
 import aiohttp
 import discord
@@ -612,13 +612,69 @@ class Eruditus(discord.Client):
                 # or add unnecessary spaces at the beginning or the end.
                 challenge.category = challenge.category.title().strip()
 
+                # An util to send new hints, if there are any
+                async def poll_hints(stored_challenge_info: Optional[dict]) -> None:
+                    if not stored_challenge_info:
+                        return
+
+                    thread = discord.utils.get(
+                        guild.threads, id=stored_challenge_info["thread"]
+                    )
+                    if not thread:
+                        return
+
+                    # Whether we modified the hint list within the challenge or not
+                    is_dirty: bool = False
+
+                    for hint in challenge.hints or []:
+                        # Skip these
+                        if hint.is_locked:
+                            continue
+
+                        if hint.should_scrap:
+                            hint = await platform.get_hint(ctx, hint.id)
+
+                        # Paid hint or something's off about it
+                        if not hint or not hint.is_scrapped:
+                            continue
+
+                        # Let's see if we already know about this hint
+                        if hint.content in stored_challenge_info["hints"]:
+                            continue
+
+                        # New hint just dropped, let's go
+                        stored_challenge_info["hints"].append(hint.content)
+                        is_dirty = True
+
+                        # Make an announcement about it
+                        new_msg = await thread.send(
+                            embed=discord.Embed(
+                                title="New hint found!",
+                                description=truncate(
+                                    hint.content,
+                                    max_len=4096,
+                                ),
+                                colour=discord.Colour.brand_red(),
+                                timestamp=datetime.now(),
+                            )
+                        )
+                        await new_msg.pin()
+
+                    # Update the challenge, if needed
+                    if is_dirty:
+                        MONGO[DBNAME][CHALLENGE_COLLECTION].update_one(
+                            {"_id": stored_challenge_info["_id"]},
+                            {"$set": {"hints": stored_challenge_info["hints"]}},
+                        )
+
                 # Check if challenge was already created.
-                if get_challenge_info(
+                if stored_challenge := get_challenge_info(
                     id=challenge.id,
                     name=challenge.name,
                     category=challenge.category,
                     ctf=ctf["_id"],
                 ):
+                    await poll_hints(stored_challenge)
                     continue
 
                 # Send challenge information in its respective thread.
@@ -733,7 +789,7 @@ class Eruditus(discord.Client):
                 )
 
                 # Add challenge to the database.
-                MONGO[DBNAME][CHALLENGE_COLLECTION].insert_one(
+                inserted_challenge = MONGO[DBNAME][CHALLENGE_COLLECTION].insert_one(
                     {
                         "_id": challenge_oid,
                         "id": challenge.id,
@@ -744,6 +800,7 @@ class Eruditus(discord.Client):
                         "solved": False,
                         "blooded": False,
                         "players": [],
+                        "hints": [],
                         "announcement": announcement.id,
                         "solve_time": None,
                         "solve_announcement": None,
@@ -763,6 +820,9 @@ class Eruditus(discord.Client):
                         continue
 
                     await challenge_thread.add_user(user)
+
+                # Poll for hints
+                await poll_hints(get_challenge_info(_id=inserted_challenge.inserted_id))
 
                 await text_channel.edit(
                     name=text_channel.name.replace("💤", "🔄").replace("🎯", "🔄")

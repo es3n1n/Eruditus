@@ -63,6 +63,35 @@ class ChallengeFile:
 
 
 @dataclass
+class ChallengeHint:
+    """A class representing a CTF challenge hint
+
+    Author:
+        @es3n1n
+
+    Attributes:
+        id: The challenge hint ID
+        cost: The challenge hint cost in points (None or 0 for a free hint)
+        content: The challenge hint content (if scrapped)
+        is_locked: Set to true if the challenge hint is locked (i.e we need to pay for it)
+    """
+
+    id: str
+    cost: Optional[int] = None
+    content: Optional[str] = None
+    is_locked: bool = False
+
+    @property
+    def is_scrapped(self) -> bool:
+        return self.content is not None
+
+    @property
+    def should_scrap(self) -> bool:
+        # We are unlocking only free hints
+        return (self.cost or 0) == 0 and not self.is_scrapped
+
+
+@dataclass
 class Challenge:
     """A class representing a CTF challenge.
 
@@ -85,7 +114,6 @@ class Challenge:
 
     TODO:
         Add max_attempts/attempts
-        Add hints
         Add connection_info
 
     Notes:
@@ -104,6 +132,7 @@ class Challenge:
     files: Optional[list[ChallengeFile]] = None
     images: Optional[list[ChallengeFile]] = None
     connection_info: Optional[str] = None
+    hints: Optional[list[ChallengeHint]] = None
     solves: Optional[int] = None
     solved_by: Optional[list[ChallengeSolver]] = None
     solved_by_me: bool = False
@@ -461,6 +490,16 @@ class PlatformABC(ABC):
         cls, ctx: PlatformCTX, challenge_id: str, limit: int = 10
     ) -> AsyncIterator[ChallengeSolver]:
         yield ChallengeSolver(team=Team(id="", name=""), solved_at=datetime.utcnow())
+
+    @classmethod
+    @abstractmethod
+    async def get_hint(cls, ctx: PlatformCTX, hint_id: str) -> Optional[ChallengeHint]:
+        pass
+
+    @classmethod
+    @abstractmethod
+    async def unlock_hint(cls, ctx: PlatformCTX, hint_id: str) -> bool:
+        pass
 
     @classmethod
     @abstractmethod
