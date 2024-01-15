@@ -32,8 +32,7 @@ from lib.discord_util import (
     send_scoreboard,
 )
 from lib.platforms import PlatformCTX, match_platform
-from lib.types import CTFStatusMode, Permissions
-from lib.types import Privacy
+from lib.types import CTFStatusMode, Permissions, Privacy
 from lib.util import (
     get_all_challenges_info,
     get_all_workon_info,
@@ -781,6 +780,7 @@ class CTF(app_commands.Group):
                 "blooded": False,
                 "players": [],
                 "announcement": announcement.id,
+                "hints": [],
                 "solve_time": None,
                 "solve_announcement": None,
                 "flag": None,
@@ -851,8 +851,8 @@ class CTF(app_commands.Group):
     @app_commands.checks.bot_has_permissions(manage_channels=True)
     @app_commands.command()
     @app_commands.autocomplete(
-        name=get_challenge_autocompletion_func(False, "name", "category")
-    )  # type: ignore
+        name=get_challenge_autocompletion_func(False, "name", "category")  # type: ignore
+    )
     @_in_ctf_channel()
     async def deletechallenge(
         self, interaction: discord.Interaction, name: Optional[str] = None

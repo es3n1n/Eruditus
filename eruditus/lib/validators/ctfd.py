@@ -3,7 +3,7 @@ from typing import Any, Optional, Union
 
 from pydantic import BaseModel, field_validator
 
-from lib.platforms.abc import Challenge, ChallengeSolver, Team
+from lib.platforms.abc import Challenge, ChallengeHint, ChallengeSolver, Team
 from lib.util import extract_images_from_html, html_to_markdown, parse_attachment
 
 
@@ -40,13 +40,29 @@ class SolvesResponse(BaseValidResponse):
     data: list[Solver]
 
 
+class CTFDHint(BaseModel):
+    id: int
+    cost: int
+    content: Optional[str] = None
+
+    # Full info
+    type: Optional[str] = None
+    challenge_id: Optional[int] = None
+    challenge: Optional[int] = None
+    html: Optional[str] = None
+
+    def convert(self) -> ChallengeHint:
+        content = html_to_markdown(self.html) if self.html is not None else self.content
+        return ChallengeHint(
+            id=str(self.id),
+            cost=self.cost,
+            content=content,
+            is_locked=not content and (self.cost or 0) > 0,
+        )
+
+
 class CTFDChallenge(BaseModel):
     """CTFd challenge representation that could be returned from `/challenges/*`."""
-
-    class Hint(BaseModel):
-        id: int
-        cost: int
-        content: Optional[str] = None
 
     # Required fields
     id: int
@@ -72,7 +88,7 @@ class CTFDChallenge(BaseModel):
     typedata: Optional[dict] = None
     attempts: Optional[int] = None
     files: Optional[list[str]] = None
-    hints: Optional[list[Hint]] = None
+    hints: Optional[list[CTFDHint]] = None
     view: Optional[str] = None
 
     def convert(self, url_stripped: str) -> Challenge:
@@ -90,6 +106,7 @@ class CTFDChallenge(BaseModel):
             else None,
             images=extract_images_from_html(self.description, url_stripped),
             connection_info=self.connection_info,
+            hints=[x.convert() for x in self.hints] if self.hints else None,
             solves=self.solves,
             solved_by_me=self.solved_by_me,
         )
@@ -139,6 +156,26 @@ class ChallengesResponse(BaseValidResponse):
     """Response schema returned by `/api/v1/challenges`."""
 
     data: list[CTFDChallenge]
+
+
+class HintResponse(BaseValidResponse):
+    """Response schema returned by `/api/v1/hints/:id`."""
+
+    data: CTFDHint
+
+
+class UnlockResponse(BaseValidResponse):
+    """Response schema returned by `/api/v1/unlocks`."""
+
+    class Data(BaseModel):
+        date: str
+        team_id: int
+        type: str
+        id: int
+        target: int
+        user_id: int
+
+    data: Data
 
 
 class ScoreboardResponse(BaseValidResponse):

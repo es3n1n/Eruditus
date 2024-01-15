@@ -7,6 +7,7 @@ import aiohttp
 from config import USER_AGENT
 from lib.platforms.abc import (
     Challenge,
+    ChallengeHint,
     ChallengeSolver,
     Optional,
     PlatformABC,
@@ -409,3 +410,13 @@ class RCTF(PlatformABC):
             return challenge
 
         return None
+
+    @classmethod
+    async def get_hint(cls, ctx: PlatformCTX, hint_id: str) -> Optional[ChallengeHint]:
+        # No hints on rCTF
+        return None
+
+    @classmethod
+    async def unlock_hint(cls, ctx: PlatformCTX, hint_id: str) -> bool:
+        # No hints on rCTF
+        return False
