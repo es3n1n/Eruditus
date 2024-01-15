@@ -1501,10 +1501,7 @@ class CTF(app_commands.Group):
 
         modal = await create_credentials_modal_for_platform(url, platform, interaction)
         if modal is None:
-            await interaction.followup.send(
-                content=f"Something went wrong! `modal is None`",
-                ephemeral=True,
-            )
+            # Should happen only if all credentials already present in the URL
             return
 
         class Prompt(discord.ui.View):

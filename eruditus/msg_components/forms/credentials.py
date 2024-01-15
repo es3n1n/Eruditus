@@ -3,6 +3,7 @@ from urllib.parse import parse_qs, urlencode, urlparse
 
 import discord
 
+from lib.discord_util import is_deferred
 from lib.discord_util import update_credentials
 from lib.platforms import Platform, PlatformABC, PlatformCTX
 from lib.util import (
@@ -37,7 +38,8 @@ class CredentialsForm(discord.ui.Modal, title="Add CTF credentials"):
 async def add_credentials_callback(
     self: CredentialsForm, interaction: discord.Interaction
 ) -> None:
-    await interaction.response.defer()
+    if not is_deferred(interaction):
+        await interaction.response.defer()
     match Platform(self.platform):
         case Platform.RCTF:
             invite = self.invite.value or self.url
