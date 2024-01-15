@@ -260,6 +260,10 @@ class CTFd(PlatformABC):
             # Loop through the challenges and get information about each challenge by
             # requesting the `/api/v1/challenges/{challenge_id}` endpoint.
             for chal in data.data:
+                # UoF24 fix: Skip hidden challenges
+                if chal.type.lower() == "hidden":
+                    continue
+
                 challenge = await cls.get_challenge(ctx, str(chal.id))
                 if challenge is None:
                     continue
