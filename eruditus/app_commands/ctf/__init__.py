@@ -773,6 +773,7 @@ class CTF(app_commands.Group):
             {
                 "_id": challenge_oid,
                 "id": None,
+                "ctf": ctf["_id"],
                 "name": name,
                 "category": category,
                 "thread": challenge_thread.id,

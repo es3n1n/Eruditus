@@ -637,7 +637,10 @@ class Eruditus(discord.Client):
 
                 # Check if challenge was already created.
                 if get_challenge_info(
-                    id=challenge.id, name=challenge.name, category=challenge.category
+                    id=challenge.id,
+                    name=challenge.name,
+                    category=challenge.category,
+                    ctf=ctf["_id"],
                 ):
                     continue
 
@@ -757,6 +760,7 @@ class Eruditus(discord.Client):
                     {
                         "_id": challenge_oid,
                         "id": challenge.id,
+                        "ctf": ctf["_id"],
                         "name": challenge.name,
                         "category": challenge.category,
                         "thread": challenge_thread.id,
