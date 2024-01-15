@@ -45,7 +45,9 @@ class FlagSubmissionForm(discord.ui.Modal, title="Flag submission form"):
 
         result = await platform.submit_flag(ctx, challenge["id"], self.flag.value)
         if result is None:
-            await interaction.followup.send("❌ Failed to submit the flag.")
+            await interaction.followup.send(
+                "❌ Failed to submit the flag (internal error, contact admin)."
+            )
             return
 
         error_messages: dict[SubmittedFlagState, str] = {
@@ -60,16 +62,19 @@ class FlagSubmissionForm(discord.ui.Modal, title="Flag submission form"):
             SubmittedFlagState.UNKNOWN: "❌ Unknown error.",
         }
 
+        def append_flag(msg: str) -> str:
+            return f"{msg} `{self.flag.value}`"
+
         if result.state in error_messages:
             error_msg = error_messages.get(result.state)
             if result.retries is not None:
                 error_msg += f" / {result.retries.left} retries left"
-            await interaction.followup.send(error_msg)
+            await interaction.followup.send(append_flag(error_msg))
             return
 
         if result.state != SubmittedFlagState.CORRECT:
             await interaction.followup.send(
-                f"Unknown state: {result.state.name} {result.state.value}"
+                append_flag(f"Unknown state: {result.state.name} {result.state.value}")
             )
             return
 
@@ -83,7 +88,9 @@ class FlagSubmissionForm(discord.ui.Modal, title="Flag submission form"):
 
         if result.is_first_blood:
             challenge["blooded"] = True
-            await interaction.followup.send("🩸 Well done, you got first blood!")
+            await interaction.followup.send(
+                append_flag("🩸 Well done, you got first blood!")
+            )
             embed = discord.Embed(
                 title="🩸 First blood!",
                 description=(
@@ -95,7 +102,9 @@ class FlagSubmissionForm(discord.ui.Modal, title="Flag submission form"):
                 timestamp=datetime.now(),
             ).set_thumbnail(url=interaction.user.display_avatar.url)
         else:
-            await interaction.followup.send("✅ Well done, challenge solved!")
+            await interaction.followup.send(
+                append_flag("✅ Well done, challenge solved!")
+            )
             embed = discord.Embed(
                 title="🎉 Challenge solved!",
                 description=(
