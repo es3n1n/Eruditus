@@ -622,7 +622,7 @@ class Eruditus(discord.Client):
                 description = (
                     "\n".join(
                         (
-                            challenge.description,
+                            challenge.description or "",
                             f"`{challenge.connection_info}`"
                             if challenge.connection_info is not None
                             else "",
@@ -634,7 +634,7 @@ class Eruditus(discord.Client):
 
                 # Format file information.
                 files = []
-                for file in challenge.files:
+                for file in challenge.files or []:
                     if file.name is not None:
                         hyperlink = f"[{file.name}]({file.url})"
                     else:
