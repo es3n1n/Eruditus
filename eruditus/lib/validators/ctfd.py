@@ -208,6 +208,7 @@ class UserResponse(BaseValidResponse):
         fields: list[dict]
         affiliation: Optional[str] = None
         bracket: Optional[Any] = None
+        bracket_id: Optional[Any] = None
         name: str
         place: Optional[str] = None
         score: int
