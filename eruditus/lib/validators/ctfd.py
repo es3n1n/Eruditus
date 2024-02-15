@@ -207,7 +207,8 @@ class UserResponse(BaseValidResponse):
         captain_id: int
         fields: list[dict]
         affiliation: Optional[str]
-        bracket: Optional[Any]
+        bracket: Optional[Any] = None
+        bracket_id: Optional[Any] = None
         name: str
         place: Optional[str]
         score: int
