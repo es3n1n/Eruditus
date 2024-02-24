@@ -125,7 +125,28 @@ class Traboda(PlatformABC):
             method="post",
             url=f"{ctx.url_stripped}/api/graphql/",
             json={
-                "query": "query ($after: String, $keyword: String, $filters: ChallengeFilterInput, $sort: ChallengeSortInput) {  challenges(after: $after, keyword: $keyword, filters: $filters, sort: $sort) {    hasNext    lastCursor    facets{        categories {            category {                name                id                slug            }            results        }    }    challenges{      id      name      points      solveStatus{        label      }      difficulty{        label        level      }      category{        id        name        slug      }    }  }}",
+                "query": """
+query ($after: String, $keyword: String, $filters: ChallengeFilterInput, $sort: ChallengeSortInput) {
+  challenges(after: $after, keyword: $keyword, filters: $filters, sort: $sort) {
+    challenges{
+      id
+      name
+      points
+      solveStatus{
+        label
+      }
+      difficulty{
+        label
+        level
+      }
+      category{
+        id
+        name
+        slug
+      }
+    }
+  }
+}""",
                 "variables": {
                     "keyword": None,
                     "filters": {
@@ -138,21 +159,22 @@ class Traboda(PlatformABC):
                     "after": None,
                 },
             },
+            cookies=ctx.session.cookies,
         ) as response:
             # Validate and deserialize response
             data = await deserialize_response(
                 response, model=traboda.GetChallengesResponse
             )
-            if not data or not data.data:
+            if not data or not data.data or not data.data.challenges:
                 return
 
             # Iterate over challenges and parse them
-            for challenge in data.data.challenges:
+            for challenge in data.data.challenges.challenges:
                 yield Challenge(
                     id=str(challenge.id),
                     name=challenge.name,
                     category=challenge.category.name,
-                    description="none",
+                    description=f"[Here]({ctx.url_stripped}/challenge/{str(challenge.id)})",  # fixme
                 )
 
     @classmethod

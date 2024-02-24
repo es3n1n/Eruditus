@@ -38,4 +38,7 @@ class ChallengesData(BaseModel):
 
 
 class GetChallengesResponse(BaseModel):
-    data: Optional[ChallengesData]
+    class Data(BaseModel):
+        challenges: Optional[ChallengesData]
+
+    data: Optional[Data]
