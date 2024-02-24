@@ -34,6 +34,8 @@ class ChallengesData(BaseModel):
         difficulty: Any
         category: Category
 
+    hasNext: bool
+    lastCursor: str
     challenges: List[Challenge]
 
 
