@@ -6,6 +6,7 @@ import aiohttp
 from lib.platforms.abc import PlatformABC, PlatformCTX
 from lib.platforms.ctfd import CTFd
 from lib.platforms.rctf import RCTF
+from lib.platforms.traboda import Traboda
 
 
 class PlatformMeta(EnumMeta):
@@ -20,6 +21,7 @@ class PlatformMeta(EnumMeta):
 class Platform(Enum, metaclass=PlatformMeta):
     CTFd = CTFd
     RCTF = RCTF
+    Traboda = Traboda
     UNKNOWN = None
 
 
