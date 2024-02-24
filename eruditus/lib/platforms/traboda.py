@@ -121,61 +121,70 @@ class Traboda(PlatformABC):
         if not await ctx.login(cls.login):
             return
 
-        async with aiohttp.request(
-            method="post",
-            url=f"{ctx.url_stripped}/api/graphql/",
-            json={
-                "query": """
-query ($after: String, $keyword: String, $filters: ChallengeFilterInput, $sort: ChallengeSortInput) {
-  challenges(after: $after, keyword: $keyword, filters: $filters, sort: $sort) {
-    challenges{
-      id
-      name
-      points
-      solveStatus{
-        label
-      }
-      difficulty{
-        label
-        level
-      }
-      category{
-        id
-        name
-        slug
-      }
-    }
-  }
-}""",
-                "variables": {
-                    "keyword": None,
-                    "filters": {
-                        "categoryID": None,
-                        "tag": None,
-                        "difficultyLevel": None,
-                        "solveStatus": None,
-                    },
-                    "sort": None,
-                    "after": None,
-                },
-            },
-            cookies=ctx.session.cookies,
-        ) as response:
-            # Validate and deserialize response
-            data = await deserialize_response(
-                response, model=traboda.GetChallengesResponse
-            )
-            if not data or not data.data or not data.data.challenges:
-                return
+        after = None
+        has_next = True
 
-            # Iterate over challenges and parse them
-            for challenge in data.data.challenges.challenges:
-                yield Challenge(
-                    id=str(challenge.id),
-                    name=challenge.name,
-                    category=challenge.category.name,
-                    description=f"[Here]({ctx.url_stripped}/challenge/{str(challenge.id)})",  # fixme
+        while has_next:
+            async with aiohttp.request(
+                method="post",
+                url=f"{ctx.url_stripped}/api/graphql/",
+                json={
+                    "query": """
+    query ($after: String, $keyword: String, $filters: ChallengeFilterInput, $sort: ChallengeSortInput) {
+      challenges(after: $after, keyword: $keyword, filters: $filters, sort: $sort) {
+        hasNext
+        lastCursor
+        challenges{
+          id
+          name
+          points
+          solveStatus{
+            label
+          }
+          difficulty{
+            label
+            level
+          }
+          category{
+            id
+            name
+            slug
+          }
+        }
+      }
+    }""",
+                    "variables": {
+                        "keyword": None,
+                        "filters": {
+                            "categoryID": None,
+                            "tag": None,
+                            "difficultyLevel": None,
+                            "solveStatus": None,
+                        },
+                        "sort": None,
+                        "after": after,
+                    },
+                },
+                cookies=ctx.session.cookies,
+            ) as response:
+                # Validate and deserialize response
+                data = await deserialize_response(
+                    response, model=traboda.GetChallengesResponse
                 )
+                if not data or not data.data or not data.data.challenges:
+                    return
+
+                # Iterate over challenges and parse them
+                for challenge in data.data.challenges.challenges:
+                    yield Challenge(
+                        id=str(challenge.id),
+                        name=challenge.name,
+                        category=challenge.category.name,
+                        description=f"[Here]({ctx.url_stripped}/challenge/{str(challenge.id)})",  # fixme
+                    )
+
+                after = data.data.challenges.lastCursor
+                has_next = data.data.challenges.hasNext
 
     @classmethod
     async def pull_scoreboard(
