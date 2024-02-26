@@ -1,9 +1,13 @@
 import io
+import re
+from json import loads
+from json import JSONDecodeError
 from typing import AsyncIterator
 
 import aiohttp
 
 from lib.platforms.abc import Challenge
+from lib.platforms.abc import ChallengeFile
 from lib.platforms.abc import ChallengeHint
 from lib.platforms.abc import ChallengeSolver
 from lib.platforms.abc import Optional
@@ -60,7 +64,8 @@ class Traboda(PlatformABC):
             method="post",
             url=f"{ctx.url_stripped}/api/graphql/",
             json={
-                "query": "mutation ($username: String!, $password: String!) { login(username: $username, password: $password) { id username name type } }",
+                "query": "mutation ($username: String!, $password: String!) { login(username: $username, password: "
+                "$password) { id username name type } }",
                 "variables": {
                     "username": ctx.args.get("username"),
                     "password": ctx.args.get("password"),
@@ -109,6 +114,25 @@ class Traboda(PlatformABC):
             return io.BytesIO(content)
 
     @classmethod
+    async def extract_next_data(cls, ctx: PlatformCTX, url: str) -> Optional[dict]:
+        content = await cls.fetch(ctx, url)
+        if not content:
+            return None
+
+        content_str: str = content.read().decode("utf-8")
+        matched = re.search(
+            r'<script\s+id="__NEXT_DATA__"\s+type="application/json">(\{.*?})</script>',
+            content_str,
+        )
+        if not matched:
+            return None
+
+        try:
+            return loads(matched.group(1))
+        except JSONDecodeError:
+            return None
+
+    @classmethod
     async def submit_flag(
         cls, ctx: PlatformCTX, challenge_id: str, flag: str
     ) -> Optional[SubmittedFlag]:
@@ -130,29 +154,29 @@ class Traboda(PlatformABC):
                 url=f"{ctx.url_stripped}/api/graphql/",
                 json={
                     "query": """
-    query ($after: String, $keyword: String, $filters: ChallengeFilterInput, $sort: ChallengeSortInput) {
-      challenges(after: $after, keyword: $keyword, filters: $filters, sort: $sort) {
-        hasNext
-        lastCursor
-        challenges{
-          id
-          name
-          points
-          solveStatus{
-            label
-          }
-          difficulty{
-            label
-            level
-          }
-          category{
-            id
-            name
-            slug
-          }
-        }
+query ($after: String, $keyword: String, $filters: ChallengeFilterInput, $sort: ChallengeSortInput) {
+  challenges(after: $after, keyword: $keyword, filters: $filters, sort: $sort) {
+    hasNext
+    lastCursor
+    challenges{
+      id
+      name
+      points
+      solveStatus{
+        label
       }
-    }""",
+      difficulty{
+        label
+        level
+      }
+      category{
+        id
+        name
+        slug
+      }
+    }
+  }
+}""",
                     "variables": {
                         "keyword": None,
                         "filters": {
@@ -176,11 +200,66 @@ class Traboda(PlatformABC):
 
                 # Iterate over challenges and parse them
                 for challenge in data.data.challenges.challenges:
+                    # Extracting next page data (some challenge info is stored there :/)
+                    next_data = await cls.extract_next_data(
+                        ctx, f"{ctx.url_stripped}/challenge/{challenge.id}"
+                    )
+                    if not next_data:
+                        continue
+
+                    # Extract challenge data
+                    challenge_next_data: Optional[dict] = (
+                        next_data.get("props", {})
+                        .get("pageProps", {})
+                        .get("challenge", None)
+                    )
+                    if (
+                        not challenge_next_data
+                        or "description" not in challenge_next_data
+                        or "attachments" not in challenge_next_data
+                    ):
+                        continue
+
+                    files = list()
+                    for attachment in challenge_next_data["attachments"] or []:
+                        async with aiohttp.request(
+                            method="post",
+                            url=f"{ctx.url_stripped}/api/graphql/",
+                            json={
+                                "query": "query($id:ID!,$challengeID:ID!){getAttachmentUrl(id:$id,"
+                                "challengeID:$challengeID)}",
+                                "variables": {
+                                    "challengeID": str(challenge.id),
+                                    "id": str(attachment["id"]),
+                                },
+                            },
+                            cookies=ctx.session.cookies,
+                        ) as attachment_response:
+                            attachment_data = await deserialize_response(
+                                attachment_response, model=traboda.GetAttachmentResponse
+                            )
+                            if (
+                                not attachment_data
+                                or not attachment_data.data
+                                or not attachment_data.data.getAttachmentUrl
+                            ):
+                                continue
+
+                            files.append(
+                                ChallengeFile(
+                                    url=attachment_data.data.getAttachmentUrl,
+                                    name=attachment["name"],
+                                )
+                            )
+
                     yield Challenge(
                         id=str(challenge.id),
                         name=challenge.name,
                         category=challenge.category.name,
-                        description=f"[Here]({ctx.url_stripped}/challenge/{str(challenge.id)})",  # fixme
+                        value=challenge.points,
+                        description=challenge_next_data["description"],
+                        solved_by_me=challenge.solveStatus.is_solved,
+                        files=files,
                     )
 
                 after = data.data.challenges.lastCursor

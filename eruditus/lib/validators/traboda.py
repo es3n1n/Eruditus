@@ -1,3 +1,4 @@
+from enum import Enum
 from typing import Any
 from typing import List
 from typing import Optional
@@ -25,13 +26,29 @@ class Category(BaseModel):
     slug: Any
 
 
+class ESolveStatus(Enum):
+    UNATTEMPTED = "UNATTEMPTED"
+    SOLVED = "SOLVED"
+
+
 class ChallengesData(BaseModel):
     class Challenge(BaseModel):
-        id: Any
+        class Difficulty(BaseModel):
+            label: str
+            level: int
+
+        class SolveStatus(BaseModel):
+            label: ESolveStatus
+
+            @property
+            def is_solved(self) -> bool:
+                return self.label == ESolveStatus.SOLVED
+
+        id: str
         name: str
         points: int
-        solveStatus: Any
-        difficulty: Any
+        solveStatus: SolveStatus
+        difficulty: Difficulty
         category: Category
 
     hasNext: bool
@@ -42,5 +59,12 @@ class ChallengesData(BaseModel):
 class GetChallengesResponse(BaseModel):
     class Data(BaseModel):
         challenges: Optional[ChallengesData]
+
+    data: Optional[Data]
+
+
+class GetAttachmentResponse(BaseModel):
+    class Data(BaseModel):
+        getAttachmentUrl: Optional[str] = None
 
     data: Optional[Data]
