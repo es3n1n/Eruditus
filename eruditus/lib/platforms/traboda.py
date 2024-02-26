@@ -1,23 +1,24 @@
 import io
 import re
-from json import loads
-from json import JSONDecodeError
+from json import JSONDecodeError, loads
 from typing import AsyncIterator
 
 import aiohttp
 
-from lib.platforms.abc import Challenge
-from lib.platforms.abc import ChallengeFile
-from lib.platforms.abc import ChallengeHint
-from lib.platforms.abc import ChallengeSolver
-from lib.platforms.abc import Optional
-from lib.platforms.abc import PlatformABC
-from lib.platforms.abc import PlatformCTX
-from lib.platforms.abc import RegistrationStatus
-from lib.platforms.abc import Session
-from lib.platforms.abc import SubmittedFlag
-from lib.platforms.abc import Team
-from lib.platforms.abc import TeamScoreHistory
+from lib.platforms.abc import (
+    Challenge,
+    ChallengeFile,
+    ChallengeHint,
+    ChallengeSolver,
+    Optional,
+    PlatformABC,
+    PlatformCTX,
+    RegistrationStatus,
+    Session,
+    SubmittedFlag,
+    Team,
+    TeamScoreHistory,
+)
 from lib.util import deserialize_response
 from lib.validators import traboda
 
