@@ -264,7 +264,7 @@ class Team:
     Attributes:
         id: The team ID.
         name: The team name.
-        username: The team name (if any).
+        username: The team username (if any).
         score: The current team score.
         invite_token: The team invite token (only used for rCTF.)
         solves: A list of challenges that this team solved (only used for rCTF).
