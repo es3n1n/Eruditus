@@ -413,7 +413,7 @@ class Traboda(PlatformABC):
 
     @classmethod
     async def register(cls, ctx: PlatformCTX) -> RegistrationStatus:
-        # todo
+        # No registration on Traboda because we have to request email OTPs and all that stuff..
         return RegistrationStatus(success=False, message="Unsupported")
 
     @classmethod
