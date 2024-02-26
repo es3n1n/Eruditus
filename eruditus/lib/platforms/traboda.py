@@ -14,8 +14,10 @@ from lib.platforms.abc import (
     PlatformABC,
     PlatformCTX,
     RegistrationStatus,
+    Retries,
     Session,
     SubmittedFlag,
+    SubmittedFlagState,
     Team,
     TeamScoreHistory,
 )
@@ -78,7 +80,7 @@ class Traboda(PlatformABC):
 
     @classmethod
     async def fetch(cls, ctx: PlatformCTX, url: str) -> Optional[io.BytesIO]:
-        """Fetch a URL endpoint from the rCTF platform and return its response.
+        """Fetch a URL endpoint from the Traboda platform and return its response.
 
         Args:
             ctx: Platform context.
@@ -130,8 +132,60 @@ class Traboda(PlatformABC):
     async def submit_flag(
         cls, ctx: PlatformCTX, challenge_id: str, flag: str
     ) -> Optional[SubmittedFlag]:
-        # todo
-        return None
+        # Authorize if needed
+        if not await ctx.login(cls.login):
+            return None
+
+        # Send submission request
+        async with aiohttp.request(
+            method="post",
+            url=f"{ctx.url_stripped}/api/graphql/",
+            json={
+                "query": "mutation ($challengeID: ID!, $flag: String!){submitFlag(challengeID:$challengeID,flag:$flag){"
+                "isAccepted isLogged isDuplicate points attemptsLeft explanation}}",
+                "variables": {"challengeID": challenge_id, "flag": flag},
+            },
+            cookies=ctx.session.cookies,
+        ) as response:
+            # Validate and deserialize response
+            data = await deserialize_response(
+                response, model=traboda.SubmitFlagResponse
+            )
+
+            # Initialize result
+            result: SubmittedFlag = SubmittedFlag(state=SubmittedFlagState.UNKNOWN)
+
+            # Something went wrong
+            if not data or not data.data or not data.data.submitFlag:
+                # Treat this error as invalid flag
+                if (
+                    data
+                    and data.error
+                    and data.error.message == "Flag value is too short"
+                ):
+                    result.state = SubmittedFlagState.INCORRECT
+                return result
+
+            # Flag accepted! yay
+            result.state = SubmittedFlagState.INCORRECT
+            if data.data.submitFlag.isAccepted:
+                result.state = SubmittedFlagState.CORRECT
+
+            # Merge retries left, if needed
+            if data.data.submitFlag.attemptsLeft is not None:
+                result.retries = Retries(left=data.data.submitFlag.attemptsLeft)
+
+            # Update first blood state
+            await result.update_first_blood(
+                ctx,
+                cls.pull_challenge_solvers,
+                cls.get_challenge,
+                challenge_id,
+                await cls.get_me(ctx),
+            )
+
+            # We are done here
+            return result
 
     @classmethod
     async def pull_challenges(cls, ctx: PlatformCTX) -> AsyncIterator[Challenge]:

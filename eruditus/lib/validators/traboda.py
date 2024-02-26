@@ -4,6 +4,12 @@ from typing import Any, List, Optional
 from pydantic import BaseModel
 
 
+class BaseError(BaseModel):
+    message: str
+    locations: list[Any]
+    path: list[Any]
+
+
 class LoginData(BaseModel):
     id: int
     username: str
@@ -66,3 +72,20 @@ class GetAttachmentResponse(BaseModel):
         getAttachmentUrl: Optional[str] = None
 
     data: Optional[Data]
+
+
+class SubmitFlag(BaseModel):
+    isAccepted: bool
+    isLogged: bool
+    isDuplicate: bool
+    points: Optional[int]
+    attemptsLeft: Optional[int]
+    explanation: Optional[Any]
+
+
+class SubmitFlagResponse(BaseModel):
+    class Data(BaseModel):
+        submitFlag: Optional[SubmitFlag]
+
+    data: Optional[Data]
+    error: Optional[BaseError] = None
