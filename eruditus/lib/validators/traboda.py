@@ -102,7 +102,7 @@ class Contestant(BaseModel):
     avatarURL: Optional[str]
 
     def convert(self) -> Team:
-        return Team(id=self.id, name=self.name)
+        return Team(id=self.id, name=self.name, username=self.username)
 
 
 class ChallengeSolver(BaseModel):
@@ -150,5 +150,22 @@ class ScoreboardResponse(BaseModel):
             scores: list[ScoreboardEntry]
 
         scoreboard: Scoreboard
+
+    data: Optional[Data]
+
+
+class DataPointsResponse(BaseModel):
+    class Data(BaseModel):
+        class Contest(BaseModel):
+            class Stats(BaseModel):
+                class Participant(BaseModel):
+                    # { team: { datetime: points, datetime: points, ... }, ... }
+                    topScorersGraph: dict[str, dict[datetime, int]]
+
+                participant: Participant
+
+            stats: Stats
+
+        contest: Contest
 
     data: Optional[Data]
