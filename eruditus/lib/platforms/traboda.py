@@ -23,25 +23,18 @@ from lib.util import deserialize_response
 from lib.validators import traboda
 
 
-def generate_headers(ctx: PlatformCTX) -> dict[str, str]:
-    if not ctx.session or not ctx.session.validate():
-        return {}
-
-    return {"Authorization": f'Bearer {ctx.args["authToken"]}'}
-
-
 class Traboda(PlatformABC):
     name = "Traboda"
 
     @classmethod
     async def match_platform(cls, ctx: PlatformCTX) -> bool:
-        """Check whether a website is using the rCTF framework.
+        """Check whether a website is using the Traboda framework.
 
         Args:
             ctx: Platform context.
 
         Returns:
-            True if the platform is using rCTF, else False.
+            True if the platform is using Traboda, else False.
 
         Raises:
             aiohttp.ClientError: if something goes wrong while communicating with the
@@ -303,7 +296,7 @@ query ($after: String, $keyword: String, $filters: ChallengeFilterInput, $sort: 
     async def get_challenge(
         cls, ctx: PlatformCTX, challenge_id: str
     ) -> Optional[Challenge]:
-        """Retrieve a challenge from the rCTF platform.
+        """Retrieve a challenge from the Traboda platform.
 
         Args:
             ctx: Platform context.
@@ -313,26 +306,13 @@ query ($after: String, $keyword: String, $filters: ChallengeFilterInput, $sort: 
             Parsed challenge.
 
         Notes:
-            Because rCTF doesn't have an API endpoint for fetching a single challenge
-            at a time, we need to request all challenges using the `/api/v1/challs`
-            endpoint and loop through them in order to fetch a specific challenge.
+            Because Traboda doesn't have an API endpoint for fetching a single challenge
+            at a time, we need to request all challenges and loop through them in order
+            to fetch a specific challenge.
         """
 
         # Iterate over unsolved challenges
         async for challenge in cls.pull_challenges(ctx):
-            # Compare challenge IDs
-            if challenge.id != challenge_id:
-                continue
-
-            return challenge
-
-        # Obtain our team object
-        our_team: Team = await cls.get_me(ctx)
-        if our_team is None:
-            return None
-
-        # Iterate over solved challenges
-        for challenge in our_team.solves or []:
             # Compare challenge IDs
             if challenge.id != challenge_id:
                 continue
