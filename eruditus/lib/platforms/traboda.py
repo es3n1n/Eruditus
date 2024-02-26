@@ -347,8 +347,48 @@ class Traboda(PlatformABC):
     async def pull_scoreboard_datapoints(
         cls, ctx: PlatformCTX, count: int = 10
     ) -> Optional[list[TeamScoreHistory]]:
-        # todo
-        return None
+        # Authorize if needed
+        if not await ctx.login(cls.login):
+            return
+
+        # Request datapoints
+        async with aiohttp.request(
+            method="post",
+            url=f"{ctx.url_stripped}/api/graphql/",
+            json={
+                "query": "{contest{stats{participant{topScorersGraph}}}}",
+                "variables": None,
+            },
+            cookies=ctx.session.cookies,
+        ) as response:
+            # Deserializing response
+            data = await deserialize_response(
+                response, model=traboda.DataPointsResponse
+            )
+            if not data or not data.data:
+                return None
+
+            # Get ourselves
+            me = await cls.get_me(ctx)
+
+            # Assembling score history
+            result = list()
+            for (
+                team_name,
+                team_score_history,
+            ) in data.data.contest.stats.participant.topScorersGraph.items():
+                result.append(
+                    TeamScoreHistory(
+                        name=team_name,
+                        is_me=me and me.username == team_name,
+                        history=[
+                            TeamScoreHistory.HistoryItem(time=time, score=score)
+                            for time, score in team_score_history.items()
+                        ],
+                    )
+                )
+
+            return result
 
     @classmethod
     async def get_me(cls, ctx: PlatformCTX) -> Optional[Team]:
