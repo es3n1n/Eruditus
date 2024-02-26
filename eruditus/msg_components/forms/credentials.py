@@ -81,6 +81,20 @@ async def add_credentials_callback(
                 ),
             }
 
+        case Platform.Traboda:
+            credentials = {
+                "url": self.url,
+                "username": self.username.value,
+                "password": self.password.value,
+                "_message": (
+                    f"Traboda platform: {self.url}\n"
+                    "```yaml\n"
+                    f"Username: {self.username.value}\n"
+                    f"Password: {self.password.value}\n"
+                    "```"
+                ),
+            }
+
         case _:
             lines = [
                 f"CTF platfrom: {self.url}",
@@ -221,6 +235,15 @@ async def create_credentials_modal_for_platform(
                 **make_fields(
                     "username", "password", *(["email"] if is_registration else [])
                 ),
+            )
+
+        # Traboda
+        case Platform.Traboda:
+            return CredentialsForm(
+                url=url,
+                platform=Platform.Traboda,
+                callback=callback,
+                **make_fields("username", "password"),
             )
 
         # rCTF platform

@@ -108,6 +108,7 @@ class Challenge:
         value: The challenge value (i.e., number of awarded points) at the time of
             its creation (this may change if the scoring is dynamic).
         files: A list of file attachments associated to this challenge.
+        hints: A list of challenge hints.
         connection_info: The challenge connection info.
         solves: The number of solves on this challenge.
         solved_by: List of solvers who solved this challenge.
@@ -264,6 +265,7 @@ class Team:
     Attributes:
         id: The team ID.
         name: The team name.
+        username: The team username (if any).
         score: The current team score.
         invite_token: The team invite token (only used for rCTF.)
         solves: A list of challenges that this team solved (only used for rCTF).
@@ -271,6 +273,7 @@ class Team:
 
     id: str
     name: str
+    username: Optional[str] = None
     score: Optional[int] = None
     invite_token: Optional[str] = None
     solves: Optional[list[Challenge]] = None
