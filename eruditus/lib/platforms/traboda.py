@@ -276,8 +276,24 @@ query ($after: String, $keyword: String, $filters: ChallengeFilterInput, $sort: 
 
     @classmethod
     async def get_me(cls, ctx: PlatformCTX) -> Optional[Team]:
-        # todo
-        return None
+        next_data = await cls.extract_next_data(ctx, f"{ctx.url_stripped}/profile")
+        if not next_data:
+            return None
+
+        contestant: Optional[dict] = (
+            next_data.get("props", {})
+            .get("pageProps", {})
+            .get("me", {})
+            .get("contestant", None)
+        )
+        if not contestant:
+            return None
+
+        return Team(
+            id=contestant["id"],
+            name=contestant["name"],
+            score=contestant["score"]["points"],
+        )
 
     @classmethod
     async def register(cls, ctx: PlatformCTX) -> RegistrationStatus:
