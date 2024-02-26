@@ -288,6 +288,14 @@ class Traboda(PlatformABC):
                         description=challenge_next_data["description"],
                         solved_by_me=challenge.solveStatus.is_solved,
                         files=files,
+                        hints=[
+                            ChallengeHint(
+                                id=hint["id"],
+                                cost=hint["points"],
+                                content=hint["content"],
+                            )
+                            for hint in (challenge_next_data["hints"] or [])
+                        ],
                     )
 
                 after = data.data.challenges.lastCursor
@@ -486,10 +494,10 @@ class Traboda(PlatformABC):
 
     @classmethod
     async def get_hint(cls, ctx: PlatformCTX, hint_id: str) -> Optional[ChallengeHint]:
-        # No hints on traboda
+        # No hints unlock on traboda
         return None
 
     @classmethod
     async def unlock_hint(cls, ctx: PlatformCTX, hint_id: str) -> bool:
-        # No hints on traboda
+        # No hints unlock on traboda
         return False
