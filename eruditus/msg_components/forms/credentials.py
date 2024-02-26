@@ -243,9 +243,7 @@ async def create_credentials_modal_for_platform(
                 url=url,
                 platform=Platform.Traboda,
                 callback=callback,
-                **make_fields(
-                    "username", "password", *(["email"] if is_registration else [])
-                ),
+                **make_fields("username", "password"),
             )
 
         # rCTF platform
