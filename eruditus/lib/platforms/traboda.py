@@ -201,30 +201,10 @@ class Traboda(PlatformABC):
                 method="post",
                 url=f"{ctx.url_stripped}/api/graphql/",
                 json={
-                    "query": """
-query ($after: String, $keyword: String, $filters: ChallengeFilterInput, $sort: ChallengeSortInput) {
-  challenges(after: $after, keyword: $keyword, filters: $filters, sort: $sort) {
-    hasNext
-    lastCursor
-    challenges{
-      id
-      name
-      points
-      solveStatus{
-        label
-      }
-      difficulty{
-        label
-        level
-      }
-      category{
-        id
-        name
-        slug
-      }
-    }
-  }
-}""",
+                    "query": "query($after:String,$keyword:String,$filters:ChallengeFilterInput,"
+                    "$sort:ChallengeSortInput){challenges(after:$after,keyword:$keyword,filters:$filters,"
+                    "sort:$sort){hasNext lastCursor challenges{id name points solveStatus{label}difficulty{"
+                    "label level}category{id name slug}}}}",
                     "variables": {
                         "keyword": None,
                         "filters": {
