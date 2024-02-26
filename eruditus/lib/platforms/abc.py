@@ -108,6 +108,7 @@ class Challenge:
         value: The challenge value (i.e., number of awarded points) at the time of
             its creation (this may change if the scoring is dynamic).
         files: A list of file attachments associated to this challenge.
+        hints: A list of challenge hints.
         connection_info: The challenge connection info.
         solves: The number of solves on this challenge.
         solved_by: List of solvers who solved this challenge.
