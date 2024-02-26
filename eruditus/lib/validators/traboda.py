@@ -1,3 +1,4 @@
+from datetime import datetime
 from enum import Enum
 from typing import Any, List, Optional
 
@@ -89,3 +90,32 @@ class SubmitFlagResponse(BaseModel):
 
     data: Optional[Data]
     error: Optional[BaseError] = None
+
+
+class ChallengeSolver(BaseModel):
+    class Contestant(BaseModel):
+        id: str
+        name: str
+        username: str
+        avatarID: Optional[str]
+        avatarURL: Optional[str]
+
+    contestant: Contestant
+    timestamp: datetime
+    points: int
+
+
+class ChallengeSolversResponse(BaseModel):
+    class Data(BaseModel):
+        class Challenge(BaseModel):
+            class Stats(BaseModel):
+                class Submissions(BaseModel):
+                    submissions: list[ChallengeSolver]
+
+                submissions: Submissions
+
+            stats: Stats
+
+        challenge: Challenge
+
+    data: Optional[Data]

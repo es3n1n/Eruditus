@@ -358,9 +358,43 @@ query ($after: String, $keyword: String, $filters: ChallengeFilterInput, $sort: 
     async def pull_challenge_solvers(
         cls, ctx: PlatformCTX, challenge_id: str, limit: int = 10
     ) -> AsyncIterator[ChallengeSolver]:
-        # todo
-        for x in []:
-            yield x
+        # Authorize if needed
+        if not await ctx.login(cls.login):
+            return
+
+        # Send submission request
+        async with aiohttp.request(
+            method="post",
+            url=f"{ctx.url_stripped}/api/graphql/",
+            json={
+                "query": "query($id:ID!,$after:String,$isAccepted:Boolean,$keyword:String){ challenge(id: $id)"
+                "{stats{submissions(after:$after,isAccepted:$isAccepted,keyword:$keyword){lastCursor hasNext"
+                " totalCount submissions{contestant{id name username avatarID avatarURL}timestamp points}}}}}",
+                "variables": {
+                    "after": None,
+                    "id": challenge_id,
+                    "isAccepted": True,
+                    "keyword": "",
+                },
+            },
+            cookies=ctx.session.cookies,
+        ) as response:
+            # Deserialize response
+            data = await deserialize_response(
+                response, model=traboda.ChallengeSolversResponse
+            )
+            if not data or not data.data:
+                return
+
+            # Iterating through solvers and returning them
+            for solver in data.data.challenge.stats.submissions.submissions:
+                yield ChallengeSolver(
+                    team=Team(
+                        id=solver.contestant.id,
+                        name=solver.contestant.name,
+                    ),
+                    solved_at=solver.timestamp,
+                )
 
     @classmethod
     async def get_challenge(
