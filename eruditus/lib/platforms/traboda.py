@@ -317,9 +317,51 @@ query ($after: String, $keyword: String, $filters: ChallengeFilterInput, $sort: 
     async def pull_scoreboard(
         cls, ctx: PlatformCTX, max_entries_count: int = 20
     ) -> AsyncIterator[Team]:
-        # todo
-        for x in []:
-            yield x
+        # Authorize if needed
+        if not await ctx.login(cls.login):
+            return
+
+        # Send submission request
+        async with aiohttp.request(
+            method="post",
+            url=f"{ctx.url_stripped}/api/graphql/",
+            json={
+                "query": "query($count:Int,$keyword:String,$offset:Int,$filters:ScoreboardFilterInput,"
+                "$sort:ScoreboardSortInput){scoreboard(offset:$offset,filters:$filters,sort:$sort,count:$count"
+                ",keyword:$keyword){totalCount hasNext scores{rank points lastSubmission firstBloods "
+                "secondBloods thirdBloods grade{score grade }flagsSubmitted answersSubmitted completion{percent total "
+                "completed}challenges{challengeID status blood}contestant{id avatarURL avatarID username name "
+                "type}}myScore{rank points lastSubmission firstBloods secondBloods thirdBloods grade{ score "
+                "grade}flagsSubmitted answersSubmitted completion{percent total completed}challenges{"
+                "challengeID status blood}contestant{id avatarURL avatarID username name type}}}}",
+                "variables": {
+                    "count": max_entries_count,
+                    "filters": {
+                        "affiliationID": None,
+                        "categoryID": None,
+                        "country": None,
+                        "difficultyLevel": None,
+                        "tagIDs": None,
+                    },
+                    "keyword": "",
+                    "offset": 0,
+                    "sort": {"order": "asc", "sort": "DEFAULT"},
+                },
+            },
+            cookies=ctx.session.cookies,
+        ) as response:
+            # Deserialize response
+            data = await deserialize_response(
+                response, model=traboda.ScoreboardResponse
+            )
+            if not data or not data.data:
+                return
+
+            # Yield scoreboard entries
+            for entry in data.data.scoreboard.scores:
+                it = entry.contestant.convert()
+                it.score = entry.points
+                yield it
 
     @classmethod
     async def pull_scoreboard_datapoints(
@@ -389,10 +431,7 @@ query ($after: String, $keyword: String, $filters: ChallengeFilterInput, $sort: 
             # Iterating through solvers and returning them
             for solver in data.data.challenge.stats.submissions.submissions:
                 yield ChallengeSolver(
-                    team=Team(
-                        id=solver.contestant.id,
-                        name=solver.contestant.name,
-                    ),
+                    team=solver.contestant.convert(),
                     solved_at=solver.timestamp,
                 )
 
