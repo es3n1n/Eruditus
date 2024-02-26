@@ -4,6 +4,8 @@ from typing import Any, List, Optional
 
 from pydantic import BaseModel
 
+from lib.platforms.abc import Team
+
 
 class BaseError(BaseModel):
     message: str
@@ -92,14 +94,18 @@ class SubmitFlagResponse(BaseModel):
     error: Optional[BaseError] = None
 
 
-class ChallengeSolver(BaseModel):
-    class Contestant(BaseModel):
-        id: str
-        name: str
-        username: str
-        avatarID: Optional[str]
-        avatarURL: Optional[str]
+class Contestant(BaseModel):
+    id: str
+    name: str
+    username: str
+    avatarID: Optional[str]
+    avatarURL: Optional[str]
 
+    def convert(self) -> Team:
+        return Team(id=self.id, name=self.name)
+
+
+class ChallengeSolver(BaseModel):
     contestant: Contestant
     timestamp: datetime
     points: int
@@ -117,5 +123,32 @@ class ChallengeSolversResponse(BaseModel):
             stats: Stats
 
         challenge: Challenge
+
+    data: Optional[Data]
+
+
+class ScoreboardEntry(BaseModel):
+    rank: int
+    points: int
+    lastSubmission: Optional[Any]
+    firstBloods: Optional[Any]
+    secondBloods: Optional[Any]
+    thirdBloods: Optional[Any]
+    grade: Optional[Any]
+    flagsSubmitted: Optional[int]
+    answersSubmitted: Optional[int]
+    completion: Optional[Any]
+    challenges: Optional[list[Any]]
+    contestant: Contestant
+
+
+class ScoreboardResponse(BaseModel):
+    class Data(BaseModel):
+        class Scoreboard(BaseModel):
+            totalCount: int
+            hasNext: bool
+            scores: list[ScoreboardEntry]
+
+        scoreboard: Scoreboard
 
     data: Optional[Data]
