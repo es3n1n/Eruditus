@@ -73,7 +73,8 @@ class ChallengeHint:
         id: The challenge hint ID
         cost: The challenge hint cost in points (None or 0 for a free hint)
         content: The challenge hint content (if scrapped)
-        is_locked: Set to true if the challenge hint is locked (i.e we need to pay for it)
+        is_locked: Set to true if the challenge hint is locked
+            (i.e we need to pay for it)
     """
 
     id: str

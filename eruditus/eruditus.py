@@ -468,16 +468,31 @@ class Eruditus(discord.Client):
             method="get",
             url=f"{CTFTIME_URL}/api/v1/events/",
             params={"limit": "20"},
-            headers={"User-Agent": USER_AGENT},
+            headers={"User-Agent": USER_AGENT()},
         ) as response:
             if response.status == 200:
                 for event in await response.json():
+                    event_start = None
+                    event_end = None
+
                     event_info = await scrape_event_info(event["id"])
                     if event_info is None:
-                        continue
+                        # Cloudflare protection, unable to scrape the event page.
+                        event_info = event
+                        event_info["name"] = event_info["title"]
+                        event_info["website"] = event_info["url"]
+                        event_info[
+                            "prizes"
+                        ] = "Visit the event page for more information."
+                        event_info["organizers"] = [
+                            organizer["name"] for organizer in event_info["organizers"]
+                        ]
+                        event_start = datetime.fromisoformat(event_info["start"])
+                        event_end = datetime.fromisoformat(event_info["finish"])
 
-                    event_start = ctftime_date_to_datetime(event_info["start"])
-                    event_end = ctftime_date_to_datetime(event_info["end"])
+                    if event_start is None or event_end is None:
+                        event_start = ctftime_date_to_datetime(event_info["start"])
+                        event_end = ctftime_date_to_datetime(event_info["end"])
 
                     # Ignore event if start/end times are incorrect.
                     if event_end <= event_start:
@@ -508,12 +523,16 @@ class Eruditus(discord.Client):
                     ):
                         continue
 
-                    async with aiohttp.request(
-                        method="get",
-                        url=event_info["logo"],
-                        headers={"User-Agent": USER_AGENT},
-                    ) as image:
-                        raw_image = io.BytesIO(await image.read()).read()
+                    if event_info["logo"]:
+                        async with aiohttp.request(
+                            method="get",
+                            url=event_info["logo"],
+                            headers={"User-Agent": USER_AGENT()},
+                        ) as image:
+                            if image.status == 200:
+                                raw_image = io.BytesIO(await image.read()).read()
+                            else:
+                                raw_image = None
 
                     # Check if the platform is supported.
                     ctx = PlatformCTX.from_credentials({"url": event_info["website"]})
@@ -553,6 +572,10 @@ class Eruditus(discord.Client):
                         ),
                         "privacy_level": discord.PrivacyLevel.guild_only,
                     }
+
+                    # Remove image parameter if we couldn't fetch the logo.
+                    if raw_image is None:
+                        parameters.pop("image")
 
                     # In case the event was already scheduled, we update it, otherwise
                     # we create a new event.
@@ -878,6 +901,14 @@ class Eruditus(discord.Client):
         for update_type in (diff := self.previous_team_info - team_info):
             match update_type:
                 case CTFTimeDiffType.OVERALL_POINTS_UPDATE:
+                    if (
+                        abs(
+                            self.previous_team_info.overall_points
+                            - team_info.overall_points
+                        )
+                        < 1
+                    ):
+                        continue
                     decreased = (
                         self.previous_team_info.overall_points
                         > team_info.overall_points
@@ -919,6 +950,14 @@ class Eruditus(discord.Client):
                         f"```"
                     )
                     for event_diff in diff[CTFTimeDiffType.EVENT_UPDATE]:
+                        if (
+                            abs(
+                                event_diff[0].rating_points
+                                - event_diff[1].rating_points
+                            )
+                            < 1
+                        ):
+                            continue
                         await channel.send(
                             msg.format(
                                 event_diff[0].event_name,
@@ -960,11 +999,10 @@ class Eruditus(discord.Client):
         if not leaderboard:
             return
 
-        # If we didn't have a previous state to compare with, we save this one and bail
-        # out.
+        first_run = False
         if not self.previous_leaderboard:
+            first_run = True
             self.previous_leaderboard = leaderboard
-            return
 
         # Detect changes and post them into the relevant channel.
         head = f"📊 {'Rank':<10} {'Country':<53} {'Points':<15} {'Events':<10} Name\n\n"
@@ -996,7 +1034,7 @@ class Eruditus(discord.Client):
         chunks.append(chunk)
 
         self.previous_leaderboard = leaderboard
-        if not update:
+        if not update and not first_run:
             return
 
         await channel.purge()
