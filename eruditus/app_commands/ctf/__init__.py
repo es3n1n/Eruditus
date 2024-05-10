@@ -242,16 +242,6 @@ class CTF(app_commands.Group):
                private threads.
             name: CTF name (default: current channel's CTF).
         """
-        """Archive a CTF by making its channels read-only by default.
-
-                Args:
-                    interaction: The interaction that triggered this command.
-                    permissions: Whether channels should be read-only or writable
-                       as well (default: read only).
-                    members: A list of member or role mentions to be granted access into the
-                       private threads.
-                    name: CTF name (default: current channel's CTF).
-                """
 
         async def get_confirmation() -> bool:
             class Prompt(discord.ui.View):
@@ -851,7 +841,9 @@ class CTF(app_commands.Group):
     @app_commands.checks.bot_has_permissions(manage_channels=True)
     @app_commands.command()
     @app_commands.autocomplete(
-        name=get_challenge_autocompletion_func(False, "name", "category")  # type: ignore
+        name=get_challenge_autocompletion_func(  # type: ignore
+            False, "name", "category"
+        )
     )
     @_in_ctf_channel()
     async def deletechallenge(
@@ -1520,7 +1512,8 @@ class CTF(app_commands.Group):
                 await new_interaction.response.send_modal(modal)
 
         await interaction.followup.send(
-            content=f"Identified platform as `{platform.name if platform is not None else 'Unknown'}`",
+            content=f"Identified platform as `"
+            f"{platform.name if platform is not None else 'Unknown'}`",
             view=Prompt(),
         )
 
