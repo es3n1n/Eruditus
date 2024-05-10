@@ -12,7 +12,7 @@ async def get_ctftime_team_info(team_id: int) -> Optional[CTFTimeTeam]:
     async with aiohttp.request(
         method="get",
         url=f"{CTFTIME_URL}/team/{team_id}",
-        headers={"User-Agent": USER_AGENT},
+        headers={"User-Agent": USER_AGENT()},
     ) as response:
         if response.status != 200:
             return None
@@ -32,7 +32,11 @@ async def get_ctftime_team_info(team_id: int) -> Optional[CTFTimeTeam]:
         country_rank = int(a_tag.text.strip())
 
     # Get the results of the current year.
-    table_rows = parser.select(".table-striped").pop(0).select("tr:has(td)")
+    table_rows = []
+    for table in parser.select(".active .table-striped"):
+        if (header := table.select("th")) and header.pop(0).text == "Place":
+            table_rows = table.select("tr:has(td)")
+            break
 
     result = CTFTimeTeam(
         overall_points=float(points),

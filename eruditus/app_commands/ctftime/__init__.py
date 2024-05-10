@@ -33,6 +33,10 @@ class CTFTime(app_commands.Group):
 
         no_running_events = True
         async for event_info in scrape_current_events():
+            if event_info is None:
+                # FIXME Attempt to pull the current events from the REST API.
+                continue
+
             embed = (
                 discord.Embed(
                     title=f"🔴 {event_info['name']} is live",
@@ -87,57 +91,64 @@ class CTFTime(app_commands.Group):
             method="get",
             url=f"{CTFTIME_URL}/api/v1/events/",
             params={"limit": str(min(limit, 10))},
-            headers={"User-Agent": USER_AGENT},
+            headers={"User-Agent": USER_AGENT()},
         ) as response:
-            if response.status == 200:
-                for event in await response.json():
-                    event_info = await scrape_event_info(event["id"])
-                    if event_info is None:
-                        continue
+            if response.status != 200:
+                return
 
-                    embed = (
-                        discord.Embed(
-                            title=f"🆕 {event_info['name']}",
-                            description=(
-                                f"Event website: {event_info['website']}\n"
-                                f"CTFtime URL: {CTFTIME_URL}/event/{event_info['id']}"
-                            ),
-                            color=discord.Colour.red(),
-                        )
-                        .set_thumbnail(url=event_info["logo"])
-                        .add_field(
-                            name="Description",
-                            value=event_info["description"],
-                            inline=False,
-                        )
-                        .add_field(
-                            name="Prizes", value=event_info["prizes"], inline=False
-                        )
-                        .add_field(
-                            name="Format",
-                            value=f"{event_info['location']} {event_info['format']}",
-                            inline=True,
-                        )
-                        .add_field(
-                            name="Organizers",
-                            value=", ".join(event_info["organizers"]),
-                            inline=True,
-                        )
-                        .add_field(
-                            name="Weight", value=event_info["weight"], inline=True
-                        )
-                        .add_field(
-                            name="Timeframe",
-                            value=f"{event_info['start']}\n{event_info['end']}",
-                            inline=False,
-                        )
+            no_upcoming_events = True
+            for event in await response.json():
+                event_info = await scrape_event_info(event["id"])
+                if event_info is None:
+                    # Cloudflare protection, unable to scrape the event page.
+                    event_info = event
+                    event_info["name"] = event_info["title"]
+                    event_info["website"] = event_info["url"]
+                    event_info["prizes"] = "Visit the event page for more information."
+                    event_info["organizers"] = [
+                        organizer["name"] for organizer in event_info["organizers"]
+                    ]
+                    event_info["end"] = event_info["finish"]
+
+                embed = (
+                    discord.Embed(
+                        title=f"🆕 {event_info['name']}",
+                        description=(
+                            f"Event website: {event_info['website']}\n"
+                            f"CTFtime URL: {CTFTIME_URL}/event/{event_info['id']}"
+                        ),
+                        color=discord.Colour.red(),
                     )
+                    .set_thumbnail(url=event_info["logo"])
+                    .add_field(
+                        name="Description",
+                        value=event_info["description"],
+                        inline=False,
+                    )
+                    .add_field(name="Prizes", value=event_info["prizes"], inline=False)
+                    .add_field(
+                        name="Format",
+                        value=f"{event_info['location']} {event_info['format']}",
+                        inline=True,
+                    )
+                    .add_field(
+                        name="Organizers",
+                        value=", ".join(event_info["organizers"]),
+                        inline=True,
+                    )
+                    .add_field(name="Weight", value=event_info["weight"], inline=True)
+                    .add_field(
+                        name="Timeframe",
+                        value=f"{event_info['start']}\n{event_info['end']}",
+                        inline=False,
+                    )
+                )
 
-                    no_upcoming_events = False
-                    await interaction.followup.send(embed=embed)
+                no_upcoming_events = False
+                await interaction.followup.send(embed=embed)
 
-                if no_upcoming_events:
-                    await interaction.followup.send("No upcoming CTFs.")
+            if no_upcoming_events:
+                await interaction.followup.send("No upcoming CTFs.")
 
     @app_commands.command()
     async def top(self, interaction: discord.Interaction, year: Optional[int]) -> None:
@@ -156,7 +167,7 @@ class CTFTime(app_commands.Group):
         async with aiohttp.request(
             method="get",
             url=f"{CTFTIME_URL}/api/v1/top/{year}/",
-            headers={"User-Agent": USER_AGENT},
+            headers={"User-Agent": USER_AGENT()},
         ) as response:
             if response.status == 200 and year in (json := await response.json()):
                 teams = json[year]
@@ -193,26 +204,45 @@ class CTFTime(app_commands.Group):
             method="get",
             url=f"{CTFTIME_URL}/api/v1/events/",
             params={"limit": "20"},
-            headers={"User-Agent": USER_AGENT},
+            headers={"User-Agent": USER_AGENT()},
         ) as response:
             if response.status == 200:
                 for event in await response.json():
+                    event_start = None
+                    event_end = None
+
                     event_info = await scrape_event_info(event["id"])
                     if event_info is None:
-                        continue
+                        # Cloudflare protection, unable to scrape the event page.
+                        event_info = event
+                        event_info["name"] = event_info["title"]
+                        event_info["website"] = event_info["url"]
+                        event_info[
+                            "prizes"
+                        ] = "Visit the event page for more information."
+                        event_info["organizers"] = [
+                            organizer["name"] for organizer in event_info["organizers"]
+                        ]
+                        event_start = datetime.fromisoformat(event_info["start"])
+                        event_end = datetime.fromisoformat(event_info["finish"])
 
-                    event_start = ctftime_date_to_datetime(event_info["start"])
-                    event_end = ctftime_date_to_datetime(event_info["end"])
+                    if event_start is None or event_end is None:
+                        event_start = ctftime_date_to_datetime(event_info["start"])
+                        event_end = ctftime_date_to_datetime(event_info["end"])
 
                     if event_start > local_time + timedelta(weeks=1):
                         continue
 
-                    async with aiohttp.request(
-                        method="get",
-                        url=event_info["logo"],
-                        headers={"User-Agent": USER_AGENT},
-                    ) as image:
-                        raw_image = io.BytesIO(await image.read()).read()
+                    if event_info["logo"]:
+                        async with aiohttp.request(
+                            method="get",
+                            url=event_info["logo"],
+                            headers={"User-Agent": USER_AGENT()},
+                        ) as image:
+                            if image.status == 200:
+                                raw_image = io.BytesIO(await image.read()).read()
+                            else:
+                                raw_image = None
 
                     event_description = (
                         f"{event_info['description']}\n\n"
@@ -237,6 +267,10 @@ class CTFTime(app_commands.Group):
                         ),
                         "privacy_level": discord.PrivacyLevel.guild_only,
                     }
+
+                    # Remove image parameter if we couldn't fetch the logo.
+                    if raw_image is None:
+                        parameters.pop("image")
 
                     # In case the event was already scheduled, we update it, otherwise
                     # we create a new event.
