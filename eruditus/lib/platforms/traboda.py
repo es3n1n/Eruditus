@@ -60,8 +60,8 @@ class Traboda(PlatformABC):
             method="post",
             url=f"{ctx.url_stripped}/api/graphql/",
             json={
-                "query": "mutation ($username: String!, $password: String!) { login(username: $username, password: "
-                "$password) { id username name type } }",
+                "query": "mutation ($username: String!, $password: String!) { login(use"
+                "rname: $username, password: $password) { id username name type } }",
                 "variables": {
                     "username": ctx.args.get("username"),
                     "password": ctx.args.get("password"),
@@ -141,8 +141,9 @@ class Traboda(PlatformABC):
             method="post",
             url=f"{ctx.url_stripped}/api/graphql/",
             json={
-                "query": "mutation ($challengeID: ID!, $flag: String!){submitFlag(challengeID:$challengeID,flag:$flag){"
-                "isAccepted isLogged isDuplicate points attemptsLeft explanation}}",
+                "query": "mutation ($challengeID: ID!, $flag: String!){submitFlag(chall"
+                "engeID:$challengeID,flag:$flag){isAccepted isLogged isDuplicate points"
+                " attemptsLeft explanation}}",
                 "variables": {"challengeID": challenge_id, "flag": flag},
             },
             cookies=ctx.session.cookies,
@@ -201,10 +202,11 @@ class Traboda(PlatformABC):
                 method="post",
                 url=f"{ctx.url_stripped}/api/graphql/",
                 json={
-                    "query": "query($after:String,$keyword:String,$filters:ChallengeFilterInput,"
-                    "$sort:ChallengeSortInput){challenges(after:$after,keyword:$keyword,filters:$filters,"
-                    "sort:$sort){hasNext lastCursor challenges{id name points solveStatus{label}difficulty{"
-                    "label level}category{id name slug}}}}",
+                    "query": "query($after:String,$keyword:String,$filters:ChallengeFil"
+                    "terInput,$sort:ChallengeSortInput){challenges(after:$after,keyword"
+                    ":$keyword,filters:$filters,sort:$sort){hasNext lastCursor challeng"
+                    "es{id name points solveStatus{label}difficulty{label level}categor"
+                    "y{id name slug}}}}",
                     "variables": {
                         "keyword": None,
                         "filters": {
@@ -254,8 +256,8 @@ class Traboda(PlatformABC):
                             method="post",
                             url=f"{ctx.url_stripped}/api/graphql/",
                             json={
-                                "query": "query($id:ID!,$challengeID:ID!){getAttachmentUrl(id:$id,"
-                                "challengeID:$challengeID)}",
+                                "query": "query($id:ID!,$challengeID:ID!){getAttachment"
+                                "Url(id:$id,challengeID:$challengeID)}",
                                 "variables": {
                                     "challengeID": str(challenge.id),
                                     "id": str(attachment["id"]),
@@ -314,14 +316,17 @@ class Traboda(PlatformABC):
             method="post",
             url=f"{ctx.url_stripped}/api/graphql/",
             json={
-                "query": "query($count:Int,$keyword:String,$offset:Int,$filters:ScoreboardFilterInput,"
-                "$sort:ScoreboardSortInput){scoreboard(offset:$offset,filters:$filters,sort:$sort,count:$count"
-                ",keyword:$keyword){totalCount hasNext scores{rank points lastSubmission firstBloods "
-                "secondBloods thirdBloods grade{score grade }flagsSubmitted answersSubmitted completion{percent total "
-                "completed}challenges{challengeID status blood}contestant{id avatarURL avatarID username name "
-                "type}}myScore{rank points lastSubmission firstBloods secondBloods thirdBloods grade{ score "
-                "grade}flagsSubmitted answersSubmitted completion{percent total completed}challenges{"
-                "challengeID status blood}contestant{id avatarURL avatarID username name type}}}}",
+                "query": "query($count:Int,$keyword:String,$offset:Int,$filters:Scorebo"
+                "ardFilterInput,$sort:ScoreboardSortInput){scoreboard(offset:$offset,fi"
+                "lters:$filters,sort:$sort,count:$count,keyword:$keyword){totalCount ha"
+                "sNext scores{rank points lastSubmission firstBloods secondBloods third"
+                "Bloods grade{score grade }flagsSubmitted answersSubmitted completion{p"
+                "ercent total completed}challenges{challengeID status blood}contestant{"
+                "id avatarURL avatarID username name type}}myScore{rank points lastSubm"
+                "ission firstBloods secondBloods thirdBloods grade{ score grade}flagsSu"
+                "bmitted answersSubmitted completion{percent total completed}challenges"
+                "{challengeID status blood}contestant{id avatarURL avatarID username na"
+                "me type}}}}",
                 "variables": {
                     "count": max_entries_count,
                     "filters": {
@@ -421,7 +426,7 @@ class Traboda(PlatformABC):
 
     @classmethod
     async def register(cls, ctx: PlatformCTX) -> RegistrationStatus:
-        # No registration on Traboda because we have to request email OTPs and all that stuff..
+        # No registration on Traboda because we have to request email OTPs and such..
         return RegistrationStatus(success=False, message="Unsupported")
 
     @classmethod
@@ -437,9 +442,10 @@ class Traboda(PlatformABC):
             method="post",
             url=f"{ctx.url_stripped}/api/graphql/",
             json={
-                "query": "query($id:ID!,$after:String,$isAccepted:Boolean,$keyword:String){ challenge(id: $id)"
-                "{stats{submissions(after:$after,isAccepted:$isAccepted,keyword:$keyword){lastCursor hasNext"
-                " totalCount submissions{contestant{id name username avatarID avatarURL}timestamp points}}}}}",
+                "query": "query($id:ID!,$after:String,$isAccepted:Boolean,$keyword:Stri"
+                "ng){ challenge(id: $id){stats{submissions(after:$after,isAccepted:$isA"
+                "ccepted,keyword:$keyword){lastCursor hasNexttotalCount submissions{con"
+                "testant{id name username avatarID avatarURL}timestamp points}}}}}",
                 "variables": {
                     "after": None,
                     "id": challenge_id,
