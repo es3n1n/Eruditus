@@ -6,3 +6,4 @@ beautifulsoup4
 python-dotenv
 pymongo
 urllib3
+tldextract==5.1.2

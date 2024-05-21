@@ -16,6 +16,7 @@ class CredentialsForm(discord.ui.Modal, title="Add CTF credentials"):
     def __init__(
         self,
         url: str,
+        base_url: str,
         platform: Optional[Platform],
         callback: Callable[..., Awaitable[None]],
         **kwargs,
@@ -23,6 +24,7 @@ class CredentialsForm(discord.ui.Modal, title="Add CTF credentials"):
         super().__init__()
 
         self.url = url
+        self.base_url = base_url
         self.platform = platform
         self.callback = callback
 
@@ -39,6 +41,9 @@ async def add_credentials_callback(
 ) -> None:
     if not is_deferred(interaction):
         await interaction.response.defer()
+
+    # todo @es3n1n: this matching is so retarded, we should move this to a separate
+    #  method within the platform
     match Platform(self.platform):
         case Platform.RCTF:
             invite = self.invite.value or self.url
@@ -55,6 +60,7 @@ async def add_credentials_callback(
                 return
 
             credentials = {
+                "base_url": self.base_url,
                 "url": self.url,
                 "teamToken": team_token,
                 "invite": invite,
@@ -69,6 +75,7 @@ async def add_credentials_callback(
 
         case Platform.CTFd:
             credentials = {
+                "base_url": self.base_url,
                 "url": self.url,
                 "username": self.username.value,
                 "password": self.password.value,
@@ -81,8 +88,24 @@ async def add_credentials_callback(
                 ),
             }
 
+        case Platform.CTFJs:
+            credentials = {
+                "base_url": self.base_url,
+                "url": self.url,
+                "username": self.username.value,
+                "password": self.password.value,
+                "_message": (
+                    f"ctfjs platform: {self.url}\n"
+                    "```yaml\n"
+                    f"Username: {self.username.value}\n"
+                    f"Password: {self.password.value}\n"
+                    "```"
+                ),
+            }
+
         case Platform.Traboda:
             credentials = {
+                "base_url": self.base_url,
                 "url": self.url,
                 "username": self.username.value,
                 "password": self.password.value,
@@ -106,6 +129,7 @@ async def add_credentials_callback(
                 "```",
             ]
             credentials = {
+                "base_url": self.base_url,
                 "url": self.url,
                 "username": self.username.value,
                 "password": self.password.value,
@@ -155,7 +179,7 @@ async def register_account_callback(
                 {"token": result.invite}
             )
             credentials = {
-                "url": self.url,
+                "url": self.base_url,
                 "team": self.username.value,
                 "email": self.email.value,
                 "teamToken": result.invite,
@@ -171,7 +195,7 @@ async def register_account_callback(
 
         case Platform.CTFd:
             ctx: PlatformCTX = PlatformCTX(
-                base_url=self.url,
+                base_url=self.base_url,
                 args={
                     "username": self.username.value,
                     "email": self.email.value,
@@ -184,7 +208,7 @@ async def register_account_callback(
                 return
 
             credentials = {
-                "url": self.url,
+                "url": self.base_url,
                 "username": self.username.value,
                 "password": self.password.value,
                 "email": self.email.value,
@@ -208,7 +232,8 @@ async def register_account_callback(
 
 
 async def create_credentials_modal_for_platform(
-    url: str,
+    url: str,  # frontend
+    base_url: str,  # backend
     platform: Optional[PlatformABC],
     interaction: discord.Interaction,
     is_registration: bool = False,
@@ -230,7 +255,20 @@ async def create_credentials_modal_for_platform(
         case Platform.CTFd:
             return CredentialsForm(
                 url=url,
+                base_url=base_url,
                 platform=Platform.CTFd,
+                callback=callback,
+                **make_fields(
+                    "username", "password", *(["email"] if is_registration else [])
+                ),
+            )
+
+        # ctfjs platform
+        case Platform.CTFJs:
+            return CredentialsForm(
+                url=url,
+                base_url=base_url,
+                platform=Platform.CTFJs,
                 callback=callback,
                 **make_fields(
                     "username", "password", *(["email"] if is_registration else [])
@@ -241,6 +279,7 @@ async def create_credentials_modal_for_platform(
         case Platform.Traboda:
             return CredentialsForm(
                 url=url,
+                base_url=base_url,
                 platform=Platform.Traboda,
                 callback=callback,
                 **make_fields("username", "password"),
@@ -250,6 +289,7 @@ async def create_credentials_modal_for_platform(
         case Platform.RCTF:
             form = CredentialsForm(
                 url=url,
+                base_url=base_url,
                 platform=Platform.RCTF,
                 callback=callback,
                 **(
@@ -285,6 +325,7 @@ async def create_credentials_modal_for_platform(
     # Unknown platform
     return CredentialsForm(
         url=url,
+        base_url=base_url,
         platform=None,
         callback=callback,
         **make_fields(

@@ -1,9 +1,15 @@
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Optional, Type
 
 from pydantic import BaseModel, field_validator
 
-from lib.platforms.abc import Challenge, ChallengeFile, ChallengeSolver, Team
+from lib.platforms.abc import (
+    Challenge,
+    ChallengeFile,
+    ChallengeSolver,
+    SolvedChallenge,
+    Team,
+)
 from lib.util import convert_attachment_url, extract_images_from_html, html_to_markdown
 
 
@@ -50,8 +56,14 @@ class RCTFChallenge(BaseModel):
     description: Optional[str] = None
     author: Optional[str] = None
 
-    def convert(self, url_stripped: str, me: Optional["Team"] = None) -> Challenge:
-        return Challenge(
+    def convert(
+        self,
+        url_stripped: str,
+        me: Optional["Team"] = None,
+        solved_challenge: bool = False,
+    ) -> Challenge | SolvedChallenge:
+        mdl: Type = SolvedChallenge if solved_challenge else Challenge
+        return mdl(
             id=self.id,
             category=self.category,
             name=self.name,
@@ -92,7 +104,7 @@ class RCTFTeam(BaseModel):
             name=self.name,
             score=self.score,
             invite_token=self.teamToken,
-            solves=[x.convert(url_stripped) for x in self.solves]
+            solves=[x.convert(url_stripped, solved_challenge=True) for x in self.solves]
             if self.solves is not None
             else None,
         )
