@@ -151,12 +151,14 @@ class Eruditus(discord.Client):
             name="📈-scoreboard", category=category_channel, overwrites=overwrites
         )
 
+        # todo: @es3n1n: move this to a different function too
         ctf = {
             "name": name,
             "archived": False,
             "ended": False,
             "private": False,
             "credentials": {
+                "base_url": None,
                 "url": None,
                 "username": None,
                 "password": None,
@@ -248,6 +250,9 @@ class Eruditus(discord.Client):
 
         if result.success:
             # Add credentials.
+            # todo @es3n1n: move this to a different function,
+            #  please stop copying the code all over the place
+            ctf["credentials"]["base_url"] = ctx.base_url
             ctf["credentials"]["url"] = url
             ctf["credentials"]["username"] = TEAM_NAME
             ctf["credentials"]["password"] = password

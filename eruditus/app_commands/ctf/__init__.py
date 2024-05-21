@@ -1492,7 +1492,9 @@ class CTF(app_commands.Group):
             )
             return
 
-        modal = await create_credentials_modal_for_platform(url, platform, interaction)
+        modal = await create_credentials_modal_for_platform(
+            url, ctx.base_url, platform, interaction
+        )
         if modal is None:
             # Should happen only if all credentials already present in the URL
             return
@@ -1635,7 +1637,11 @@ class CTF(app_commands.Group):
             return
 
         form = await create_credentials_modal_for_platform(
-            url=url, platform=platform, interaction=interaction, is_registration=True
+            url=url,
+            base_url=ctx.base_url,
+            platform=platform,
+            interaction=interaction,
+            is_registration=True,
         )
 
         if not form:

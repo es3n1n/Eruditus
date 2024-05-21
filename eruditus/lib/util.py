@@ -12,10 +12,12 @@ from typing import Any, Optional, Type, TypeVar
 
 import discord
 import matplotlib.pyplot as plt
+import tldextract
 from aiohttp import ClientResponse
 from bs4 import BeautifulSoup, MarkupResemblesLocatorWarning
 from markdownify import markdownify as html2md
 from pydantic import TypeAdapter, ValidationError
+from tldextract.tldextract import ExtractResult
 
 from config import (
     CHALLENGE_COLLECTION,
@@ -28,6 +30,7 @@ from lib.platforms.abc import ChallengeFile, TeamScoreHistory
 
 T = TypeVar("T")
 _log = logging.getLogger("discord.eruditus.util")
+tld_extract = tldextract.TLDExtract()
 
 # "The input looks more like a filename than a markup" warnings
 warnings.filterwarnings("ignore", category=MarkupResemblesLocatorWarning)
@@ -35,6 +38,7 @@ warnings.filterwarnings("ignore", category=MarkupResemblesLocatorWarning)
 
 def country_name(country_code: str) -> Optional[str]:
     """Get the full country name for a given 2 letter country code."""
+    # todo es3n1n: perhaps move this big dictionary to a .json file or something
     return {
         "AF": "Afghanistan",
         "AX": "Åland Islands",
@@ -755,3 +759,30 @@ def plot_scoreboard(
     # Reset buffer position and return it.
     result.seek(0)
     return result
+
+
+def substitute_base_url(base_url: str) -> list[str]:
+    """Substitute the base url to try to discover the API subdomain for a platform.
+
+    Args:
+        base_url: Subdomain base url provided by the user
+
+    Returns:
+        A list of urls that the platform matcher should check.
+    """
+    url: urllib.parse.ParseResult = urllib.parse.urlparse(base_url)
+    domains: list[str] = [url.netloc]
+
+    # First pass, collecting base domain if the provided url is a subdomain
+    extracted: ExtractResult = tld_extract.extract_urllib(url)
+    if extracted.subdomain != "":
+        domains.append(f"{extracted.domain}.{extracted.suffix}")
+
+    # Second pass, trying common api subdomains
+    subdomains = []
+    for subdomain in ["api"]:
+        for domain in domains:
+            subdomains.append(f"{subdomain}.{domain}")
+
+    # Converting domains back to the URLs and returning
+    return [f"{url.scheme}://{domain}/" for domain in [*domains, *subdomains]]
