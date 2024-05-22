@@ -74,6 +74,7 @@ class TeamItem(TeamMin):
     created: datetime
     eligible: bool
     score: int
+    lastSolve: datetime | None = None
 
     def convert(self) -> Team:
         return Team(

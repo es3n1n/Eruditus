@@ -263,6 +263,7 @@ class CTFJs(PlatformABC):
         async with aiohttp.request(
             method="get",
             url=f"{ctx.url_stripped}/teams",
+            params={"frozen": "1"},  # frozen - scores during the ctf
             headers=generate_headers(ctx),
         ) as response:
             # Validate and deserialize response
@@ -271,10 +272,16 @@ class CTFJs(PlatformABC):
                 return
 
             # Sort by score
-            leaderboard = sorted(data, key=lambda x: x.score, reverse=True)
+            leaderboard = sorted(
+                data,
+                key=lambda x: (
+                    -x.score,  # reverse order
+                    x.lastSolve,
+                ),
+            )
 
             # Iterate over teams and parse them
-            for team in leaderboard:
+            for team in leaderboard[:max_entries_count]:
                 yield team.convert()
 
     @classmethod
