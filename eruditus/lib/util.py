@@ -12,12 +12,11 @@ from typing import Any, Optional, Type, TypeVar
 
 import discord
 import matplotlib.pyplot as plt
-import tldextract
 from aiohttp import ClientResponse
 from bs4 import BeautifulSoup, MarkupResemblesLocatorWarning
 from markdownify import markdownify as html2md
 from pydantic import TypeAdapter, ValidationError
-from tldextract.tldextract import ExtractResult
+from tldextract.tldextract import TLDExtract, ExtractResult
 
 from config import (
     CHALLENGE_COLLECTION,
@@ -30,7 +29,7 @@ from lib.platforms.abc import ChallengeFile, TeamScoreHistory
 
 T = TypeVar("T")
 _log = logging.getLogger("discord.eruditus.util")
-tld_extract = tldextract.TLDExtract()
+tld_extract = TLDExtract()
 
 # "The input looks more like a filename than a markup" warnings
 warnings.filterwarnings("ignore", category=MarkupResemblesLocatorWarning)
