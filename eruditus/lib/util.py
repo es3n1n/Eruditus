@@ -16,7 +16,7 @@ from aiohttp import ClientResponse
 from bs4 import BeautifulSoup, MarkupResemblesLocatorWarning
 from markdownify import markdownify as html2md
 from pydantic import TypeAdapter, ValidationError
-from tldextract.tldextract import TLDExtract, ExtractResult
+from tldextract.tldextract import ExtractResult, TLDExtract
 
 from config import (
     CHALLENGE_COLLECTION,
