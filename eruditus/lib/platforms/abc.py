@@ -152,6 +152,13 @@ class Challenge:
         return value
 
 
+@dataclass
+class SolvedChallenge(Challenge):
+    """Basically the same thing as the regular challenge, but it also stores solve dt"""
+
+    solved_at: Optional[datetime] = None
+
+
 @unique
 class SubmittedFlagState(IntEnum):
     """An enum representing submitted flag states.
@@ -182,7 +189,7 @@ class Retries:
     Attributes:
         left: The number of retries left.
         out_of: The maximum number of retries, or None if the number of retries is
-        unlimited.
+        unlimited/unknown.
     """
 
     left: int
@@ -269,7 +276,7 @@ class Team:
         username: The team username (if any).
         score: The current team score.
         invite_token: The team invite token (only used for rCTF.)
-        solves: A list of challenges that this team solved (only used for rCTF).
+        solves: A list of challenges that this team solved
     """
 
     id: str
@@ -277,7 +284,7 @@ class Team:
     username: Optional[str] = None
     score: Optional[int] = None
     invite_token: Optional[str] = None
-    solves: Optional[list[Challenge]] = None
+    solves: Optional[list[SolvedChallenge]] = None
 
     def __eq__(self, other: Optional["Team"]) -> bool:
         return other is not None and (self.id == other.id or self.name == other.name)
@@ -356,7 +363,7 @@ class PlatformCTX:
     """
 
     base_url: str
-    args: dict[str, str] = field(default_factory=dict)
+    args: dict[str, str | int] = field(default_factory=dict)
     session: Optional[Session] = None
 
     @property
@@ -373,7 +380,7 @@ class PlatformCTX:
             URL of the CTF platform.
         """
         return PlatformCTX(
-            base_url=credentials["url"],
+            base_url=credentials.get("base_url", credentials["url"]),
             args=credentials,
         )
 
