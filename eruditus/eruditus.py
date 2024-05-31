@@ -55,6 +55,7 @@ from lib.util import (
     get_challenge_info,
     get_ctf_info,
     get_local_time,
+    sanitize_category_name,
     sanitize_channel_name,
     truncate,
 )
@@ -635,10 +636,7 @@ class Eruditus(discord.Client):
                 # Skip solved challenges.
                 if challenge.solved_by_me:
                     continue
-
-                # Avoid having duplicate categories when people mix up upper/lower case
-                # or add unnecessary spaces at the beginning or the end.
-                challenge.category = challenge.category.title().strip()
+                challenge.category = sanitize_category_name(challenge.category)
 
                 # An util to send new hints, if there are any
                 async def poll_hints(stored_challenge_info: Optional[dict]) -> None:

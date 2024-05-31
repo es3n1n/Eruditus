@@ -299,6 +299,12 @@ def truncate(text: str, max_len: int = 1024) -> str:
     )
 
 
+def sanitize_category_name(name: str) -> str:
+    # Avoid having duplicate categories when people mix up upper/lower case
+    # or add unnecessary spaces at the beginning or the end.
+    return name.title().strip()
+
+
 def sanitize_channel_name(name: str) -> str:
     """Filter out characters that aren't allowed by Discord for guild channels.
 
