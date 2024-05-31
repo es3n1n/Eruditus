@@ -1214,7 +1214,7 @@ class CTF(app_commands.Group):
             return
 
         # Select challenges with this category
-        challenges = get_all_challenges_info(category=name, ctf_id=current_ctf["_id"])
+        challenges = get_all_challenges_info(category=name, ctf=current_ctf["_id"])
         if len(challenges) == 0:
             await interaction.response.send_message(
                 "Found 0 challenges with such category.",
