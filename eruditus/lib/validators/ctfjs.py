@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Optional
 
 from pydantic import BaseModel
 
@@ -43,7 +44,10 @@ class ChallengeItem(ChallengeMin):
     hint: str | None = None
     solves: int
 
-    def convert(self, me: Team) -> Challenge:
+    def convert(self, me: Optional[Team] = None) -> Challenge:
+        solves = []
+        if me is not None:
+            solves = me.solves or []
         return Challenge(
             id=str(self.id),
             name=self.title,
@@ -51,7 +55,7 @@ class ChallengeItem(ChallengeMin):
             description=self.description,
             value=self.value,
             solves=self.solves,
-            solved_by_me=str(self.id) in [x.id for x in (me.solves or [])],
+            solved_by_me=str(self.id) in [x.id for x in solves],
             hints=[ChallengeHint(id="", content=self.hint, is_locked=False)]
             if self.hint is not None
             else None,
