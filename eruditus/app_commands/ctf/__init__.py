@@ -36,6 +36,7 @@ from lib.util import (
     get_challenge_info,
     get_ctf_info,
     get_workon_info,
+    sanitize_category_name,
     sanitize_channel_name,
     strip_url_components,
 )
@@ -693,9 +694,7 @@ class CTF(app_commands.Group):
             name: Name of the challenge.
             category: Category of the challenge.
         """
-        # Avoid having duplicate categories when people mix up upper/lower case
-        # or add unnecessary spaces at the beginning or the end.
-        category = category.title().strip()
+        category = sanitize_category_name(category)
 
         # Check if challenge already exists.
         if get_challenge_info(name=name, category=category):
