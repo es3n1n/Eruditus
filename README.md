@@ -44,6 +44,8 @@ As you already read this bot can interact with the CTF platforms, meaning that y
 Currently, Eruditus supports these platforms:
 - CTFd
 - rCTF
+- ctfjs
+- Traboda
 
 _You can check out our [abstract interfaces](eruditus/lib/platforms/abc.py) if you wish to add support for a new platform_
 
@@ -67,6 +69,7 @@ Here's a list of the currently supported commands:
 /ctf showcreds                                       (Show credentials of the current CTF)
 /ctf status                                          (Show CTF(s) status)
 /ctf workon                                          (Access the private channel associated to the challenge)
+/ctf workon_category                                 (Access all the private channel associated to the challenge category)
 /ctf unworkon                                        (Leave the challenge channel)
 /ctf solve                                           (Mark a challenge as solved)
 /ctf unsolve                                         (Mark a challenge as not solved)
