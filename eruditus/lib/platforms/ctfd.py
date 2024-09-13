@@ -41,12 +41,6 @@ from lib.validators.ctfd import (
 _log = logging.getLogger("discord.eruditus.ctfd")
 
 
-class ChallengeType(str, Enum):
-    dynamic = "dynamic"
-    hidden = "hidden"
-    standard = "standard"
-
-
 async def fetch_csrf_token(ctx: PlatformCTX) -> Optional[str]:
     """Fetch the CSRF token from CTFd
 
@@ -64,6 +58,12 @@ async def fetch_csrf_token(ctx: PlatformCTX) -> Optional[str]:
             return None
 
         return r.group(0)
+
+
+class ChallengeType(str, Enum):
+    dynamic = "dynamic"
+    hidden = "hidden"
+    standard = "standard"
 
 
 class CTFd(PlatformABC):
