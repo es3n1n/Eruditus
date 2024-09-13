@@ -17,6 +17,7 @@ from app_commands.cipher import Cipher
 from app_commands.ctf import CTF
 from app_commands.ctftime import CTFTime
 from app_commands.encoding import Encoding
+from app_commands.export import Export
 from app_commands.help import Help
 from app_commands.intro import Intro
 from app_commands.report import Report
@@ -194,6 +195,7 @@ class Eruditus(discord.Client):
         self.tree.add_command(TakeNote(), guild=discord.Object(GUILD_ID))
         self.tree.add_command(CTF(), guild=discord.Object(GUILD_ID))
         self.tree.add_command(Intro(), guild=discord.Object(GUILD_ID))
+        self.tree.add_command(Export(), guild=discord.Object(GUILD_ID))
 
         # Restore `workon` buttons.
         for challenge in MONGO[DBNAME][CHALLENGE_COLLECTION].find({"solved": False}):
