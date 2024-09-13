@@ -30,7 +30,7 @@ class Help(app_commands.Command):
                 colour=discord.Colour.blue(),
             )
             .set_thumbnail(url=interaction.client.user.display_avatar.url)
-            .set_footer(text="Made with ❤️ by hfz.")
+            .set_footer(text="Made with ❤️ by hfz/es3n1n.")
         )
 
         # Show help for global commands.
