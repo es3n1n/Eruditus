@@ -1,13 +1,44 @@
 FROM python:3.10
 
-RUN wget https://packages.microsoft.com/config/debian/10/packages-microsoft-prod.deb \
-    -O packages-microsoft-prod.deb \
-    && dpkg -i packages-microsoft-prod.deb \
-    && rm packages-microsoft-prod.deb
+ENV DEBIAN_FRONTEND=noninteractive
+RUN dpkg --print-architecture | tee /tmp/arch
 
-RUN apt-get update && apt-get install -y dotnet-sdk-8.0 \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+ENV DOTNET_RUNNING_IN_CONTAINER=true \
+    DOTNET_USE_POLLING_FILE_WATCHER=true \
+    NUGET_XMLDOC_MODE=skip
+
+RUN if [ "$(cat /tmp/arch)" = "amd64" ]; then \
+        set -xe \
+        && wget https://packages.microsoft.com/config/ubuntu/20.04/packages-microsoft-prod.deb -O packages-microsoft-prod.deb \
+        && dpkg -i packages-microsoft-prod.deb \
+        && rm packages-microsoft-prod.deb \
+        && apt-get update \
+        && apt-get install -yq --no-install-recommends \
+            dotnet-sdk-8.0 \
+        && apt-get clean \
+        && rm -rf /var/lib/apt/lists/*; \
+    elif [ "$(cat /tmp/arch)" = "arm64" ]; then \
+        set -xe \
+        && apt-get update \
+        && apt-get install -yq --no-install-recommends \
+            curl \
+            libc6 \
+            libgcc1 \
+            libgssapi-krb5-2 \
+            libstdc++6 \
+        && apt-get clean \
+        && rm -rf /var/lib/apt/lists/* \
+        && curl -SL --output dotnet.tar.gz https://dotnetcli.blob.core.windows.net/dotnet/Sdk/8.0.401/dotnet-sdk-8.0.401-linux-arm64.tar.gz \
+        && echo "e8738b21351d030a83be644571f3674c8dda9e6fbd360b221907a7108fab02becd18e1331907535a1294d8c4d0f608519674c27c77dc2c2803cc53cce3e10e0d dotnet.tar.gz" | sha512sum -c - \
+        && mkdir -p /usr/share/dotnet \
+        && tar -C /usr/share/dotnet -zxf dotnet.tar.gz \
+        && rm dotnet.tar.gz \
+        && ln -s /usr/share/dotnet/dotnet /usr/bin/dotnet \
+        && dotnet help; \
+    else \
+        echo "Unsupported architecture"; \
+        exit 1; \
+    fi
 
 COPY requirements.txt .
 
