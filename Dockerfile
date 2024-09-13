@@ -36,6 +36,7 @@ RUN git clone https://github.com/hfz1337/DiscordChatExporter ~/DiscordChatExport
 
 ARG CHATLOGS_REPO=git@github.com:username/repo
 
+RUN chmod 0600 ~/.ssh/*
 RUN git clone --depth=1 $CHATLOGS_REPO ~/chatlogs
 RUN git config --global user.email "eruditus@localhost" && \
     git config --global user.name "eruditus"
