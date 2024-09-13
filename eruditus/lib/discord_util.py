@@ -63,6 +63,11 @@ async def parse_challenge_solvers(
     )
 
 
+def has_everyone_mention(mentions: str) -> bool:
+    # Add spaces to properly handle misspelled usernames that contain @everyone
+    return " @everyone " in (" " + mentions.strip() + " ")
+
+
 async def parse_member_mentions(
     interaction: discord.Interaction,
     members: str,
@@ -78,9 +83,7 @@ async def parse_member_mentions(
     Returns:
         A list of Discord member objects.
     """
-
-    # Add spaces to properly handle misspelled usernames that contain @everyone
-    if " @everyone " in (" " + members.strip() + " "):
+    if has_everyone_mention(members):
         return list(
             x
             for x in interaction.guild.members

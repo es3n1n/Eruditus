@@ -21,6 +21,7 @@ from config import (
 from lib.discord_util import (
     add_challenge_worker,
     get_challenge_category_channel,
+    has_everyone_mention,
     is_deferred,
     mark_if_maxed,
     parse_challenge_solvers,
@@ -587,13 +588,17 @@ class CTF(app_commands.Group):
                 member = await interaction.guild.fetch_member(user.id)
                 await member.add_roles(role)
         else:
+            has_everyone = has_everyone_mention(members)
+
             for member in await parse_member_mentions(
                 interaction, members, exclude_role=role
             ):
                 await member.add_roles(role)
-                await ctf_general_channel.send(
-                    f"{member.mention} was added by {interaction.user.mention} 🔫"
-                )
+
+                if not has_everyone:
+                    await ctf_general_channel.send(
+                        f"{member.mention} was added by {interaction.user.mention} 🔫"
+                    )
 
         await interaction.followup.send(
             f"✅ Added players to `{ctf['name']}`.", ephemeral=True
