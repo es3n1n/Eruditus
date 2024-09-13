@@ -64,17 +64,29 @@ async def parse_challenge_solvers(
 
 
 async def parse_member_mentions(
-    interaction: discord.Interaction, members: str
+    interaction: discord.Interaction,
+    members: str,
+    exclude_role: discord.Role | None = None,
 ) -> list[discord.Member]:
     """Extract Discord members mentioned in a string.
 
     Args:
         interaction: The Discord interaction.
         members: A string containing member mentions.
+        exclude_role: A role that would be added to members.
 
     Returns:
         A list of Discord member objects.
     """
+
+    # Add spaces to properly handle misspelled usernames that contain @everyone
+    if " @everyone " in (" " + members.strip() + " "):
+        return list(
+            x
+            for x in interaction.guild.members
+            if not x.bot and (not exclude_role or exclude_role not in x.roles)
+        )
+
     return [
         member
         for member_id in re.findall(r"<@!?([0-9]{15,20})>", members)

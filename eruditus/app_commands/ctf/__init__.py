@@ -587,7 +587,9 @@ class CTF(app_commands.Group):
                 member = await interaction.guild.fetch_member(user.id)
                 await member.add_roles(role)
         else:
-            for member in await parse_member_mentions(interaction, members):
+            for member in await parse_member_mentions(
+                interaction, members, exclude_role=role
+            ):
                 await member.add_roles(role)
                 await ctf_general_channel.send(
                     f"{member.mention} was added by {interaction.user.mention} 🔫"
