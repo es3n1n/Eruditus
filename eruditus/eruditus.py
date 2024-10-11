@@ -595,8 +595,12 @@ class Eruditus(discord.Client):
                         if local_time + timedelta(days=2) >= event_start:
                             parameters["start_time"] = scheduled_event.start_time
                             parameters["end_time"] = scheduled_event.end_time
-                        await scheduled_event.edit(**parameters)
-
+                        try:
+                            await scheduled_event.edit(**parameters)
+                        except discord.Forbidden as err:
+                            # 403 Forbidden (error code: 180000): Cannot update a finished event
+                            if err.code != 180000:
+                                raise err from err
                     else:
                         await guild.create_scheduled_event(**parameters)
 
