@@ -598,7 +598,7 @@ class Eruditus(discord.Client):
                         try:
                             await scheduled_event.edit(**parameters)
                         except discord.Forbidden as err:
-                            # 403 Forbidden (error code: 180000): Cannot update a finished event
+                            # 403 Forbidden 180000: Cannot update a finished event
                             if err.code != 180000:
                                 raise err from err
                     else:

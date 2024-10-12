@@ -41,6 +41,21 @@ from lib.validators.ctfd import (
 _log = logging.getLogger("discord.eruditus.ctfd")
 
 
+def extract_nonce_from_html(html_data: str) -> Optional[str]:
+    bs = BeautifulSoup(html_data, "html.parser")
+    nonce = bs.find("input", {"id": "nonce"})
+    nonce_attr = "value"
+
+    # pbctf fix
+    if nonce is None:
+        nonce = bs.find("meta", {"name": "csrf-token"})
+        nonce_attr = "content"
+
+    if nonce is None:
+        return None
+    return nonce[nonce_attr]
+
+
 async def fetch_csrf_token(ctx: PlatformCTX) -> Optional[str]:
     """Fetch the CSRF token from CTFd
 
@@ -53,9 +68,11 @@ async def fetch_csrf_token(ctx: PlatformCTX) -> Optional[str]:
     async with aiohttp.request(
         method="get", url=f"{ctx.url_stripped}/challenges", cookies=ctx.session.cookies
     ) as response:
-        r = re.search('(?<=csrfNonce\': ")[A-Fa-f0-9]+(?=")', await response.text())
+        response_text = await response.text()
+        r = re.search('(?<=csrfNonce\': ")[A-Fa-f0-9]+(?=")', response_text)
         if not r:
-            return None
+            # Try from html
+            return extract_nonce_from_html(response_text)
 
         return r.group(0)
 
@@ -112,13 +129,10 @@ class CTFd(PlatformABC):
             headers={"User-Agent": USER_AGENT()},
         ) as response:
             cookies = {cookie.key: cookie.value for cookie in response.cookies.values()}
-            nonce = BeautifulSoup(await response.text(), "html.parser").find(
-                "input", {"id": "nonce"}
-            )
+            nonce = extract_nonce_from_html(await response.text())
 
             if nonce is None:
                 return None
-            nonce = nonce["value"]
 
         # Login to CTFd.
         data = {
@@ -431,9 +445,7 @@ class CTFd(PlatformABC):
                 )
 
             cookies = {cookie.key: cookie.value for cookie in response.cookies.values()}
-            nonce = BeautifulSoup(await response.text(), "html.parser").find(
-                "input", {"id": "nonce"}
-            )["value"]
+            nonce = extract_nonce_from_html(await response.text())
 
         async with aiohttp.request(
             method="post",
@@ -474,9 +486,7 @@ class CTFd(PlatformABC):
                 cookies=cookies,
                 headers={"User-Agent": USER_AGENT()},
             ) as teams_resp:
-                nonce = BeautifulSoup(await teams_resp.text(), "html.parser").find(
-                    "input", {"id": "nonce"}
-                )["value"]
+                nonce = extract_nonce_from_html(await teams_resp.text())
 
             async with aiohttp.request(
                 method="post",
