@@ -502,9 +502,9 @@ class Eruditus(discord.Client):
                         event_start = ctftime_date_to_datetime(event_info["start"])
                         event_end = ctftime_date_to_datetime(event_info["end"])
 
-                    # Ignore event if start/end times are incorrect.
+                    # If start/end times are incorrect, just guess (hello linectf people)
                     if event_end <= event_start:
-                        continue
+                        event_end = event_start + timedelta(days=1)
 
                     # If the event starts in more than a week, then it's too soon to
                     # schedule it, we ignore it for now.
