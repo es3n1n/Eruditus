@@ -230,7 +230,7 @@ class CTFTime(app_commands.Group):
                         event_start = ctftime_date_to_datetime(event_info["start"])
                         event_end = ctftime_date_to_datetime(event_info["end"])
 
-                    # If start/end times are incorrect, just guess (hello linectf people)
+                    # If start/end times are incorrect, just guess (hello linectf 2025)
                     if event_end <= event_start:
                         event_end = event_start + timedelta(days=1)
 
